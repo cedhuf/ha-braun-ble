@@ -16,23 +16,25 @@ from .kinds import KINDS
 
 TEXTS = {
     "en": {
-        EVENT_BRAUN_MEASUREMENT: "measured {value}",
+        EVENT_BRAUN_MEASUREMENT: "measured {value}{details}",
         EVENT_BRAUN_ATTRIBUTION: "was attributed {value}, measured {time}",
         EVENT_BRAUN_IGNORED: "ignored the {value} measurement from {time}",
         "notify_message": "{value} measured {time}{details}. Who was it for?",
         "ignore": "Ignore",
         "pending_title": "Braun measurements to attribute",
+        "no_pending": "None",
         "pending_value": "{value} · {time}",
         "pending_line": "- {value}, {time}",
         "pending_link": "[Open {device}](/config/devices/device/{device_id})",
     },
     "fr": {
-        EVENT_BRAUN_MEASUREMENT: "a mesuré {value}",
+        EVENT_BRAUN_MEASUREMENT: "a mesuré {value}{details}",
         EVENT_BRAUN_ATTRIBUTION: "s'est vu attribuer {value}, mesurés le {time}",
         EVENT_BRAUN_IGNORED: "a ignoré la mesure de {value} du {time}",
         "notify_message": "{value} mesurés le {time}{details}. Pour qui ?",
         "ignore": "Ignorer",
         "pending_title": "Mesures Braun à attribuer",
+        "no_pending": "Aucune",
         "pending_value": "{value} · {time}",
         "pending_line": "- {value}, le {time}",
         "pending_link": "[Ouvrir {device}](/config/devices/device/{device_id})",

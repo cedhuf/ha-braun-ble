@@ -163,10 +163,10 @@ class BraunPendingSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEn
         self._attr_device_info = device_info(coordinator)
 
     @property
-    def native_value(self) -> str | None:
+    def native_value(self) -> str:
         """Return the oldest pending measurement and when it was taken."""
         if not self.coordinator.pending:
-            return None
+            return text(self.hass, "no_pending")
         return text(self.hass, "pending_value", self.coordinator.pending[0])
 
     @property

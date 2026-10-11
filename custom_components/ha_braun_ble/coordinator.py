@@ -158,7 +158,9 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         disconnected = asyncio.Event()
-        _LOGGER.info("Connecting to Braun device %s...", self.address)
+        details = ble_device.details if isinstance(ble_device.details, dict) else {}
+        source = details.get("source", "local adapter")
+        _LOGGER.info("Connecting to Braun device %s through %s", self.address, source)
         try:
             client = await establish_connection(
                 BleakClient,

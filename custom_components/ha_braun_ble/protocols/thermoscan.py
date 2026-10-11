@@ -11,13 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 from bleak import BleakClient
 
-from ..const import (
-    BATTERY_LEVEL_UUID,
-    CONF_AUTH_KEY,
-    CONF_ENC_KEY,
-    FIRMWARE_REVISION_UUID,
-    MODEL_NUMBER_UUID,
-)
+from ..const import BATTERY_LEVEL_UUID, CONF_AUTH_KEY, CONF_ENC_KEY
+from . import async_read_identity
 from .kaz_crypto import compute_challenge_response, decrypt_frame, derive_recovery_key, encrypt_frame
 
 if TYPE_CHECKING:
@@ -153,8 +148,7 @@ async def async_run_session(
         _LOGGER.debug("Authenticated with %s", coordinator.address)
 
         coordinator.data["battery"] = (await client.read_gatt_char(BATTERY_LEVEL_UUID))[0]
-        coordinator.data["model_number"] = (await client.read_gatt_char(MODEL_NUMBER_UUID)).decode()
-        coordinator.data["firmware"] = (await client.read_gatt_char(FIRMWARE_REVISION_UUID)).decode()
+        await async_read_identity(coordinator, client)
 
         enc_key = bytes.fromhex(coordinator.entry.data[CONF_ENC_KEY])
         sync = _RecordSync(client, enc_key, session_iv, records)

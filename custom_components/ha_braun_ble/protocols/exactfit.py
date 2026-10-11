@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from bleak import BleakClient
 
-from ..const import FIRMWARE_REVISION_UUID, MODEL_NUMBER_UUID
+from . import async_read_identity
 
 if TYPE_CHECKING:
     from ..coordinator import BraunDataUpdateCoordinator
@@ -86,8 +86,7 @@ async def async_run_session(
     watcher.add_done_callback(lambda _task: payloads.put_nowait(None))
     try:
         await client.start_notify(MEASUREMENT_UUID, lambda _char, data: payloads.put_nowait(bytes(data)))
-        coordinator.data["model_number"] = (await client.read_gatt_char(MODEL_NUMBER_UUID)).decode()
-        coordinator.data["firmware"] = (await client.read_gatt_char(FIRMWARE_REVISION_UUID)).decode()
+        await async_read_identity(coordinator, client)
         coordinator.async_synced()
         while True:
             try:
