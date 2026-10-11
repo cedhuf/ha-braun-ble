@@ -15,6 +15,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -127,8 +128,13 @@ class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator]
         super().__init__(coordinator)
         self._person_id = person.subentry_id
         self._attr_unique_id = f"{person.subentry_id}_temperature"
-        self._attr_translation_placeholders = {"person": person.title}
-        self._attr_device_info = _device_info(coordinator)
+        # Subentry entities must sit on a device of their own subentry.
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, person.subentry_id)},
+            name=person.title,
+            entry_type=DeviceEntryType.SERVICE,
+            via_device=(DOMAIN, coordinator.address),
+        )
         self._attr_extra_state_attributes = {"measured_at": None}
 
     async def async_added_to_hass(self) -> None:

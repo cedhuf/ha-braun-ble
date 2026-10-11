@@ -58,7 +58,7 @@
         "name": "Battery"
       },
       "person_temperature": {
-        "name": "Temperature {person}"
+        "name": "Temperature"
       }
     }
   },
