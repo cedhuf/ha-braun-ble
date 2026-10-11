@@ -17,9 +17,8 @@ Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and desig
 - **Guided Onboarding**: Interactive pairing wizard in Home Assistant that decrypts AES keys directly using the on-screen 6-digit PIN.
 - **Automatic Sync**: Passively listens for Bluetooth wake-up advertisements and retrieves new measurements automatically when you use the device.
 - **Sensors Exposed**:
-  - `sensor.<device>_temperature`: Body temperature in °C / °F, with age group, fever color status (normal/moderate/high), and measurement timestamp.
+  - `sensor.<device>_temperature`: Body temperature in °C / °F, with measurement timestamp and ambient temperature.
   - `sensor.<device>_battery`: Battery level percentage.
-  - `sensor.<device>_stored_records`: Total historical records count in device memory.
 - **Family Attribution Blueprint**: Ready-to-use actionable mobile notification to assign each reading to family members.
 - **Apple Health (HealthKit) Bridge**: Seamlessly export readings into Apple Health via native iOS Shortcuts.
 
@@ -84,7 +83,7 @@ Use our included blueprint:
 [`blueprints/automation/ha_braun_ble/person_attribution.yaml`](blueprints/automation/ha_braun_ble/person_attribution.yaml)
 
 Whenever someone takes a temperature reading, your phone receives a push notification:
-> **🌡️ Braun Measurement: 38.4°C (High Fever)**  
+> **🌡️ Braun Measurement: 38.4°C**  
 > *Who is this temperature reading for?*  
 > `[ Alice ]` `[ Bob ]` `[ Charlie ]`
 

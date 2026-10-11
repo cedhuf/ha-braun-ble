@@ -56,9 +56,6 @@
       },
       "battery": {
         "name": "Batterie"
-      },
-      "stored_records": {
-        "name": "Mesures en mémoire"
       }
     }
   }

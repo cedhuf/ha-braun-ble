@@ -53,31 +53,28 @@ def test_challenge_response_layout():
     assert resp[-1:] == b"\x01"
 
 
-def test_parse_record_full():
-    payload = (
-        (5).to_bytes(2, "little")
-        + (3712).to_bytes(2, "little")
-        + bytes([0b0110])  # age 36m+, fever moderate
-        + (2026).to_bytes(2, "little")
-        + bytes([10, 11, 8, 30, 0])
-    )
-    rec = parse_thermoscan_record(payload)
-
-    assert rec["record_index"] == 5
-    assert rec["temperature"] == 37.1
-    assert rec["unit"] == "°C"
-    assert rec["age_group"] == "36m+"
-    assert rec["fever_status"] == "moderate"
-    assert rec["timestamp"] == "2026-10-11T08:30:00"
-
-
 @pytest.mark.parametrize(
     ("raw", "expected"),
-    [(375, 37.5), (3712, 37.1), (0xF173, 37.1), (1000, None)],
+    [
+        (
+            "000000003f006acb658700014211f5c30b41c80000",
+            {"sequence": 0x3F, "timestamp": "2026-10-11T10:31:35+00:00", "temperature": 36.5,
+             "ambient_temperature": 25.0},
+        ),
+        (
+            "0200000045006acb697f000142123d710b41c66666",
+            {"sequence": 0x45, "timestamp": "2026-10-11T10:48:31+00:00", "temperature": 36.6,
+             "ambient_temperature": 24.8},
+        ),
+    ],
 )
-def test_parse_record_temperature_formats(raw, expected):
-    rec = parse_thermoscan_record(b"\x00\x00" + raw.to_bytes(2, "little"))
-    assert rec.get("temperature") == expected
+def test_parse_captured_ts7_records(raw, expected):
+    rec = parse_thermoscan_record(bytes.fromhex(raw))
+    assert rec == {"raw_hex": raw, "unit": "°C", **expected}
+
+
+def test_parse_short_record_keeps_raw_only():
+    assert parse_thermoscan_record(b"\x00\x01") == {"raw_hex": "0001"}
 
 
 def test_model_lookup():

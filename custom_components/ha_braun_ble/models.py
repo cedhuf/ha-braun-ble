@@ -6,8 +6,9 @@ Inspired by the extensible profile architecture in ha-govee-led-ble.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
+import struct
 from typing import Any, Callable
 
 
@@ -28,78 +29,25 @@ class BraunModelProfile:
     record_parser: Callable[[bytes], dict[str, Any]] | None = None
 
 
-def _decode_sfloat(raw: int) -> float:
-    """Decode IEEE-11073 16-bit SFLOAT value."""
-    mantissa = raw & 0x0FFF
-    if mantissa >= 0x0800:
-        mantissa -= 0x1000
-    exponent = raw >> 12
-    if exponent >= 0x08:
-        exponent -= 0x10
-    return mantissa * (10 ** exponent)
-
-
 def parse_thermoscan_record(payload: bytes) -> dict[str, Any]:
-    """Parse decrypted record from ThermoScan 7+ / ThermoScan 4.
+    """Parse a decrypted ThermoScan record (21 bytes, big-endian).
 
-    Expected record length varies between 6 and 14 bytes depending on firmware.
-    Handles both fixed-point integer (tenths/hundredths °C) and IEEE-11073 SFLOAT formats.
+    Measured on a TS7+ with firmware 1.2.0: [0] index, [4] sequence number,
+    [6:10] measurement time (Unix, UTC), [12:16] body temperature (float32, °C),
+    [17:21] ambient temperature (float32, °C). The other bytes are unknown.
     """
-    result: dict[str, Any] = {
-        "raw_hex": payload.hex(),
-        "length": len(payload),
-    }
-
-    if len(payload) < 2:
+    result: dict[str, Any] = {"raw_hex": payload.hex()}
+    if len(payload) < 21:
         return result
-
-    # Heuristic parsing of record index and temperature
-    # ThermoScan records start with a 16-bit record index or sequence number
-    if len(payload) >= 4:
-        rec_idx = int.from_bytes(payload[0:2], "little")
-        raw_temp = int.from_bytes(payload[2:4], "little")
-        result["record_index"] = rec_idx
-
-        # Test temperature interpretations
-        temp_c: float | None = None
-        if 320 <= raw_temp <= 440:
-            temp_c = raw_temp / 10.0
-        elif 3200 <= raw_temp <= 4400:
-            temp_c = raw_temp / 100.0
-        else:
-            candidate = round(_decode_sfloat(raw_temp), 1)
-            if 32.0 <= candidate <= 44.0:
-                temp_c = candidate
-
-        if temp_c is not None:
-            result["temperature"] = round(temp_c, 1)
-            result["unit"] = "°C"
-
-    # Status / AgeSmart flag byte if present
-    if len(payload) >= 5:
-        flag = payload[4]
-        # Age group (bits 0-1): 0 = 0-3m, 1 = 3-36m, 2 = 36m+
-        age_code = flag & 0x03
-        age_map = {0: "0-3m", 1: "3-36m", 2: "36m+"}
-        result["age_group"] = age_map.get(age_code, "unknown")
-
-        # Fever indicator (bits 2-3): 0 = normal (green), 1 = moderate (yellow), 2 = high (red)
-        fever_code = (flag >> 2) & 0x03
-        fever_map = {0: "normal", 1: "moderate", 2: "high"}
-        result["fever_status"] = fever_map.get(fever_code, "unknown")
-
-    # RTC Timestamp parsing if payload contains at least 11 bytes
-    # Format: [year (2 bytes little), month (1), day (1), hour (1), minute (1), second (1)]
-    if len(payload) >= 11:
-        try:
-            year = int.from_bytes(payload[5:7], "little")
-            month, day, hour, minute, second = payload[7:12]
-            if 2020 <= year <= 2040 and 1 <= month <= 12 and 1 <= day <= 31 and hour < 24 and minute < 60:
-                result["timestamp"] = datetime(year, month, day, hour, minute, min(second, 59)).isoformat()
-        except Exception:
-            pass
-
-    return result
+    (body,) = struct.unpack(">f", payload[12:16])
+    (ambient,) = struct.unpack(">f", payload[17:21])
+    return result | {
+        "sequence": payload[4],
+        "timestamp": datetime.fromtimestamp(int.from_bytes(payload[6:10], "big"), UTC).isoformat(),
+        "temperature": round(body, 1),
+        "ambient_temperature": round(ambient, 1),
+        "unit": "°C",
+    }
 
 
 def parse_blood_pressure_record(payload: bytes) -> dict[str, Any]:

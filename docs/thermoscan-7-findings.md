@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Braun ThermoScan 7+ Connect** (model `IRT6575`, manufactured by Kaz Europe Sàrl / Helen of Troy) communicates over Bluetooth Low Energy (BLE). It advertises under names like `TS7+` or `TS7`.
+The **Braun ThermoScan 7+ Connect** (model `IRT6575`, manufactured by Kaz Europe Sàrl / Helen of Troy) communicates over Bluetooth Low Energy (BLE). Its advertisements carry no local name: only the record service UUID `aeb23580-80b6-432d-9b5a-57ff6feea94e`, a second UUID ending with the reversed MAC address, and manufacturer data holding the MAC. The name `TS7+` only comes in the scan response, so passive scanners (ESPHome proxies) never see it.
 
 All functional communications (except standard unauthenticated battery reading) are encrypted using authenticated **AES-CCM** with 128-bit keys.
 
@@ -73,9 +73,21 @@ At every subsequent connection:
 6. The connection is authenticated for the session.
 
 ### 4. Record Synchronization
-1. Read encrypted record count from `RECORD_COUNT_UUID`. Decrypt with `enc_key` and `session_iv`.
-2. For index `i = 0 .. num_records - 1`:
-   - Increment session counter.
-   - Write encrypted `i.to_bytes(2, 'little')` to `RECORD_INDEX_REQUEST_UUID`.
-   - Receive notification from `RECORD_NOTIFICATION_UUID`.
-   - Decrypt with `enc_key` and `session_iv`.
+The device only serves measurements not yet synced ("new" ones). Measured on firmware 1.2.0:
+
+1. Read `RECORD_COUNT_UUID` and decrypt it: 2 bytes, `0x18` then the number of new records.
+2. Write encrypted commands to `RECORD_INDEX_REQUEST_UUID`, as `[command, index]`, incrementing the session counter for each write:
+   - `00 nn`: read new record `nn` (0 is the oldest). The record arrives as a notification on `RECORD_NOTIFICATION_UUID`.
+   - `01 00`: acknowledge the oldest new record. The count drops by one and the next record moves to index 0. Other `01 nn` / `nn 00` values also clear records; their exact meaning is unknown.
+3. A decrypted record is 21 bytes, big-endian:
+
+| Bytes | Content |
+|---|---|
+| `0` | Index that was requested |
+| `4` | Sequence number, incremented by every measurement |
+| `6..9` | Measurement time, Unix seconds, UTC |
+| `12..15` | Body temperature, float32, °C |
+| `17..20` | Ambient temperature, float32, °C |
+| others | Unknown (`5` = `00`, `10..11` = `00 01`, `16` = `0b` so far) |
+
+`RTC_TIME_UUID` decrypts to `00` + Unix time (4 bytes, UTC) + `00 00` + UTC offset in seconds (2 bytes).

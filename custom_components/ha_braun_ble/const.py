@@ -22,6 +22,10 @@ FINAL_TEMP_NOTIFICATION_UUID = "fbacb31a-6d77-4a8c-8c2d-f149ea9ff36e"
 BATTERY_LEVEL_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
 RTC_TIME_UUID = "6be10cf5-a104-4fdc-ac1a-6d700e2ea239"
 
+# Commands written (encrypted) to RECORD_INDEX_REQUEST_UUID: [command, index]
+READ_OLDEST_RECORD = b"\x00\x00"
+ACK_OLDEST_RECORD = b"\x01\x00"
+
 # Cryptographic seeds and nonces
 RECOVERY_MAGIC = bytes.fromhex("018d54d5")
 RECOVERY_KEY_TEMPLATE = b"I'm Sorry Dave!."

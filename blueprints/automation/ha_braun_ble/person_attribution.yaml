@@ -43,7 +43,6 @@ trigger:
 variables:
   temp: "{{ trigger.event.data.temperature }}"
   unit: "{{ trigger.event.data.unit | default('°C') }}"
-  fever: "{{ trigger.event.data.fever_status | default('normal') }}"
   action_p1: "{{ 'ASSIGN_P1_' ~ context.id }}"
   action_p2: "{{ 'ASSIGN_P2_' ~ context.id }}"
 
@@ -52,7 +51,7 @@ action:
     type: notify
     device_id: !input notify_device
     title: "🌡️ Braun Measurement: {{ temp }}{{ unit }}"
-    message: "Fever status: {{ fever }}. Who is this temperature reading for?"
+    message: "Who is this temperature reading for?"
     data:
       actions:
         - action: "{{ action_p1 }}"

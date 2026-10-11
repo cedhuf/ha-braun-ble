@@ -35,12 +35,6 @@ BATTERY = SensorEntityDescription(
     state_class=SensorStateClass.MEASUREMENT,
     native_unit_of_measurement=PERCENTAGE,
 )
-RECORD_COUNT = SensorEntityDescription(
-    key="record_count",
-    translation_key="stored_records",
-    state_class=SensorStateClass.TOTAL,
-    icon="mdi:counter",
-)
 
 
 async def async_setup_entry(
@@ -54,7 +48,6 @@ async def async_setup_entry(
         [
             BraunTemperatureSensor(coordinator, TEMPERATURE),
             BraunSensor(coordinator, BATTERY),
-            BraunSensor(coordinator, RECORD_COUNT),
         ]
     )
 
@@ -92,10 +85,9 @@ class BraunTemperatureSensor(BraunSensor):
         """Return additional metadata from the latest measurement."""
         rec = self.coordinator.data.get("latest_record") or {}
         return {
-            "age_group": self.coordinator.data.get("age_group"),
-            "fever_status": self.coordinator.data.get("fever_status"),
             "measured_at": rec.get("timestamp"),
-            "record_index": rec.get("record_index"),
+            "ambient_temperature": rec.get("ambient_temperature"),
+            "sequence": rec.get("sequence"),
             "last_synced": self.coordinator.data.get("last_synced"),
             "raw_hex": rec.get("raw_hex"),
         }

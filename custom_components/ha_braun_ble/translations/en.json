@@ -56,9 +56,6 @@
       },
       "battery": {
         "name": "Battery"
-      },
-      "stored_records": {
-        "name": "Stored records"
       }
     }
   }

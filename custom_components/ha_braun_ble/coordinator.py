@@ -24,6 +24,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    ACK_OLDEST_RECORD,
     BATTERY_LEVEL_UUID,
     CHALLENGE_REQUEST_UUID,
     CHALLENGE_RESPONSE_UUID,
@@ -31,7 +32,7 @@ from .const import (
     CONF_ENC_KEY,
     CONF_MODEL,
     EVENT_BRAUN_MEASUREMENT,
-    FINAL_TEMP_NOTIFICATION_UUID,
+    READ_OLDEST_RECORD,
     RECORD_COUNT_UUID,
     RECORD_INDEX_REQUEST_UUID,
     RECORD_NOTIFICATION_UUID,
@@ -68,15 +69,11 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._unsubscribe_ble: CALLBACK_TYPE | None = None
         self._sync_lock = asyncio.Lock()
-        self._last_synced_record_index: int = entry.data.get("last_synced_index", -1)
 
         # In-memory sensor state cache
         self.data: dict[str, Any] = {
             "temperature": None,
-            "age_group": None,
-            "fever_status": None,
             "battery": None,
-            "record_count": None,
             "last_synced": None,
             "latest_record": {},
         }
@@ -158,18 +155,12 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed("Device does not expose expected Kaz/Braun auth characteristics")
 
         # Set up notification queue for incoming records
-        records_queue: asyncio.Queue[tuple[str, bytes]] = asyncio.Queue()
+        records_queue: asyncio.Queue[bytes] = asyncio.Queue()
 
-        def _notification_handler(char: BleakGATTCharacteristic, data: bytearray) -> None:
-            records_queue.put_nowait((char.uuid.lower(), bytes(data)))
+        def _notification_handler(_char: BleakGATTCharacteristic, data: bytearray) -> None:
+            records_queue.put_nowait(bytes(data))
 
-        # Subscribe to record notification characteristics
-        for uuid_str in (RECORD_NOTIFICATION_UUID, FINAL_TEMP_NOTIFICATION_UUID):
-            if uuid_str.lower() in chars:
-                try:
-                    await client.start_notify(uuid_str, _notification_handler)
-                except Exception as err:
-                    _LOGGER.debug("Could not subscribe to %s: %s", uuid_str, err)
+        await client.start_notify(RECORD_NOTIFICATION_UUID, _notification_handler)
 
         # 1. Challenge / Response authentication
         challenge = await client.read_gatt_char(CHALLENGE_REQUEST_UUID)
@@ -187,70 +178,30 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except Exception as err:
                 _LOGGER.debug("Could not read battery level: %s", err)
 
-        # 3. Read Stored Record Count
-        num_records = 0
-        if RECORD_COUNT_UUID.lower() in chars:
-            enc_count = await client.read_gatt_char(RECORD_COUNT_UUID)
-            if enc_count:
-                dec_count = decrypt_frame(enc_count, self.enc_key, session_iv)
-                if len(dec_count) >= 2:
-                    num_records = int.from_bytes(dec_count[:2], "little")
-                    self.data["record_count"] = num_records
-                    _LOGGER.debug("Device has %d stored records", num_records)
+        # 3. Read the number of measurements not yet synced (second byte)
+        enc_count = await client.read_gatt_char(RECORD_COUNT_UUID)
+        pending = decrypt_frame(enc_count, self.enc_key, session_iv)[1]
+        _LOGGER.debug("Device has %d new records", pending)
 
-        # 4. Read new records
-        latest_record_data: dict[str, Any] = {}
+        # 4. Read the oldest new record, then acknowledge it: the device drops it from
+        # its new list and the next one moves to index 0.
         counter = 1
 
-        if RECORD_INDEX_REQUEST_UUID.lower() in chars and num_records > 0:
-            # Query the newest records
-            start_index = max(0, self._last_synced_record_index + 1)
-            # Memory was cleared on the device: resync from its latest record
-            if start_index > num_records:
-                start_index = max(0, num_records - 1)
+        async def send(command: bytes) -> None:
+            nonlocal counter
+            counter += 1
+            req = encrypt_frame(command, self.enc_key, session_iv, counter)
+            await client.write_gatt_char(RECORD_INDEX_REQUEST_UUID, req, response=True)
 
-            for idx in range(start_index, num_records):
-                counter += 1
-                req = encrypt_frame(idx.to_bytes(2, "little"), self.enc_key, session_iv, counter)
-                await client.write_gatt_char(RECORD_INDEX_REQUEST_UUID, req, response=True)
-
-                try:
-                    _uuid, frame = await asyncio.wait_for(records_queue.get(), timeout=3.5)
-                    plain = decrypt_frame(frame, self.enc_key, session_iv)
-
-                    parsed = {}
-                    if self.profile.record_parser:
-                        parsed = self.profile.record_parser(plain)
-                    else:
-                        parsed = {"raw_hex": plain.hex()}
-
-                    latest_record_data = parsed
-                    self._last_synced_record_index = idx
-
-                    # Dispatch Home Assistant Event for each measurement
-                    self._async_dispatch_measurement_event(parsed)
-
-                except asyncio.TimeoutError:
-                    _LOGGER.debug("Timeout waiting for record %d", idx)
-                    break
-                except Exception as err:
-                    _LOGGER.warning("Error decrypting record %d: %s", idx, err)
-
-        # Update cache data if new record found
-        if latest_record_data:
-            if "temperature" in latest_record_data:
-                self.data["temperature"] = latest_record_data["temperature"]
-            if "fever_status" in latest_record_data:
-                self.data["fever_status"] = latest_record_data["fever_status"]
-            if "age_group" in latest_record_data:
-                self.data["age_group"] = latest_record_data["age_group"]
-            self.data["latest_record"] = latest_record_data
-
-        if self._last_synced_record_index != self.entry.data.get("last_synced_index", -1):
-            self.hass.config_entries.async_update_entry(
-                self.entry,
-                data={**self.entry.data, "last_synced_index": self._last_synced_record_index},
-            )
+        for _ in range(pending):
+            await send(READ_OLDEST_RECORD)
+            frame = await asyncio.wait_for(records_queue.get(), timeout=3.5)
+            record = self.profile.record_parser(decrypt_frame(frame, self.enc_key, session_iv))
+            self._async_dispatch_measurement_event(record)
+            self.data["latest_record"] = record
+            if "temperature" in record:
+                self.data["temperature"] = record["temperature"]
+            await send(ACK_OLDEST_RECORD)
 
         self.data["last_synced"] = datetime.now().isoformat()
         self.async_set_updated_data(self.data)
