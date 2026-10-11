@@ -1,0 +1,3 @@
+sync:
+  name: Synchronize Device
+  description: Triggers an immediate connection and synchronization with a Braun BLE device.
