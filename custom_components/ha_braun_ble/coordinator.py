@@ -276,10 +276,9 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not self.pending:
             persistent_notification.async_dismiss(self.hass, notification_id)
             return
-        device = dr.async_get(self.hass).async_get_device(identifiers={(DOMAIN, self.address)})
         lines = [text(self.hass, "pending_line", record) for record in self.pending]
-        if device:
-            lines += ["", text(self.hass, "pending_link", device=self.entry.title, device_id=device.id)]
+        if device_id := self._device_id(self.address):
+            lines += ["", text(self.hass, "pending_link", device=self.entry.title, device_id=device_id)]
         persistent_notification.async_create(
             self.hass,
             "\n".join(lines),
@@ -338,9 +337,8 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @callback
     def _async_fire(self, event_type: str, device_identifier: str, record: dict[str, Any]) -> None:
         """Fire an event tied to a device, so it shows in that device's activity."""
-        device = dr.async_get(self.hass).async_get_device(identifiers={(DOMAIN, device_identifier)})
         event_data = {
-            "device_id": device.id if device else None,
+            "device_id": self._device_id(device_identifier),
             "entry_id": self.entry.entry_id,
             "device_address": self.address,
             "device_name": self.entry.title,
@@ -349,6 +347,15 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         _LOGGER.debug("Firing %s event: %s", event_type, event_data)
         self.hass.bus.async_fire(event_type, event_data)
+
+    @callback
+    def _device_id(self, identifier: str) -> str | None:
+        """Return the id of this entry's device with the given identifier."""
+        # Identifiers are only unique within a config entry.
+        for device in dr.async_entries_for_config_entry(dr.async_get(self.hass), self.entry.entry_id):
+            if (DOMAIN, identifier) in device.identifiers:
+                return device.id
+        return None
 
     async def async_unload(self) -> None:
         """Unload coordinator and clean up listeners."""
