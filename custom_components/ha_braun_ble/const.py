@@ -11,6 +11,7 @@ CONF_PERSON = "person"
 CONF_DEFAULT_PERSON = "default_person"
 CONF_PEOPLE = "people"
 CONF_NOTIFY = "notify"
+CONF_DEVICE_USER = "device_user"
 
 # Subentry type for the people measurements are attributed to
 SUBENTRY_PERSON = "person"

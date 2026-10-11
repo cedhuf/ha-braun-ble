@@ -11,7 +11,6 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 
 from .const import DOMAIN, SUBENTRY_PERSON
 from .coordinator import BraunDataUpdateCoordinator
-from .kinds import COMMON_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,7 +52,7 @@ def _async_remove_stale_entities(
 ) -> None:
     """Drop entities from earlier versions or from removed people."""
     kind = coordinator.profile.kind
-    device_keys = [d.key for d in kind.device_sensors] + [d.key for d in COMMON_SENSORS]
+    device_keys = [d.key for d in (*kind.device_sensors, *coordinator.profile.common_sensors)]
     expected = {f"{coordinator.address}_{key}" for key in (*device_keys, "pending", "ignore")}
     for person in entry.get_subentries_of_type(SUBENTRY_PERSON):
         expected |= {f"{person.subentry_id}_{d.key}" for d in kind.person_sensors}

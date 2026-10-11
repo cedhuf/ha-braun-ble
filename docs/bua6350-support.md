@@ -1,7 +1,7 @@
 # Braun ExactFit 5 Connect (BUA6350) support
 
-**Status: Research.** Not supported yet. Live measurements were captured and decoded
-on real hardware; nothing is implemented in the integration.
+**Status: Experimental.** Implemented from the captures below and tested against them;
+not yet qualified end to end through Home Assistant on the real device.
 
 ## Scope and evidence
 
@@ -110,13 +110,16 @@ accepts it; never written.
   write-only characteristics.
 - Whether a passive ESPHome proxy receives the local name, or only the service UUID.
 
-## Planned support
+## Implemented support
 
-- Discovery on the service UUID `56484aae-…`, setup without PIN or keys.
+- Discovery on the service UUID `56484aae-…` or the name `BUA*`, setup without PIN or keys.
 - One session per use: subscribe to `2db34480-…`, hand each measurement over until the
   monitor disconnects.
-- Device users `A` and `B` linked to people, so measurements are attributed without
-  the queue; the queue only for an unlinked user.
+- Device users `A` and `B` linked to people (at setup, or with the device user field of a
+  person), so their measurements are attributed without the queue; the queue only for an
+  unlinked user.
 - Systolic, diastolic and pulse sensors on the device and on each person, with
-  statistics at the measurement time; mean arterial pressure and status bits as
+  statistics at the measurement time; mean arterial pressure, user and status bits as
   attributes.
+- No battery sensor: the battery characteristic does not report a percentage.
+- The clock is not set: its write format is unconfirmed.

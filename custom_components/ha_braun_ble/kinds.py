@@ -11,8 +11,8 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
-from homeassistant.util.unit_conversion import TemperatureConverter
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPressure, UnitOfTemperature
+from homeassistant.util.unit_conversion import PressureConverter, TemperatureConverter
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -111,7 +111,73 @@ TEMPERATURE = MeasurementKind(
     format_details=_format_age_profile,
 )
 
-KINDS = {kind.key: kind for kind in (TEMPERATURE,)}
+BPM = "bpm"
+BLOOD_PRESSURE_FLAGS = {
+    "en": {
+        "body_movement": "body movement",
+        "cuff_too_loose": "cuff too loose",
+        "irregular_pulse": "irregular pulse",
+    },
+    "fr": {
+        "body_movement": "mouvement détecté",
+        "cuff_too_loose": "brassard trop lâche",
+        "irregular_pulse": "pouls irrégulier",
+    },
+}
+
+
+def _format_blood_pressure(record: dict[str, Any], language: str) -> str:
+    pulse = "pouls" if language == "fr" else "pulse"
+    return f"{record.get('systolic')}/{record.get('diastolic')} mmHg, {pulse} {record.get('pulse')}"
+
+
+def _format_blood_pressure_details(record: dict[str, Any], language: str) -> str:
+    parts = []
+    if user := record.get("user"):
+        parts.append(f"utilisateur {user}" if language == "fr" else f"user {user}")
+    parts += [label for flag, label in BLOOD_PRESSURE_FLAGS[language].items() if record.get(flag)]
+    return f" ({', '.join(parts)})" if parts else ""
+
+
+def _pressure_sensor(key: str, record_attributes: bool = False, **kwargs: Any) -> BraunSensorDescription:
+    return BraunSensorDescription(
+        key=key,
+        translation_key=key,
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.MMHG,
+        icon="mdi:heart-pulse",
+        record_attributes=record_attributes,
+        **kwargs,
+    )
+
+
+def _pulse_sensor(**kwargs: Any) -> BraunSensorDescription:
+    return BraunSensorDescription(
+        key="pulse", translation_key="pulse", native_unit_of_measurement=BPM, icon="mdi:heart", **kwargs
+    )
+
+
+BLOOD_PRESSURE = MeasurementKind(
+    key="blood_pressure",
+    value_fields=("systolic", "diastolic", "pulse"),
+    attributes=("mean_arterial_pressure", "user", "body_movement", "cuff_too_loose", "irregular_pulse"),
+    device_sensors=(
+        _pressure_sensor("systolic", record_attributes=True, state_class=SensorStateClass.MEASUREMENT),
+        _pressure_sensor("diastolic", state_class=SensorStateClass.MEASUREMENT),
+        _pulse_sensor(state_class=SensorStateClass.MEASUREMENT),
+    ),
+    # No state class on people: their statistics are written at the measurement time instead.
+    person_sensors=(_pressure_sensor("systolic"), _pressure_sensor("diastolic"), _pulse_sensor()),
+    statistics=(
+        Statistic("systolic", UnitOfPressure.MMHG, PressureConverter.UNIT_CLASS, " systolic"),
+        Statistic("diastolic", UnitOfPressure.MMHG, PressureConverter.UNIT_CLASS, " diastolic"),
+        Statistic("pulse", BPM, None, " pulse"),
+    ),
+    format_value=_format_blood_pressure,
+    format_details=_format_blood_pressure_details,
+)
+
+KINDS = {kind.key: kind for kind in (TEMPERATURE, BLOOD_PRESSURE)}
 
 # Device sensors every model has, whatever it measures.
 BATTERY = SensorEntityDescription(

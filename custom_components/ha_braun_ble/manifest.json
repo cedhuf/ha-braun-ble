@@ -10,6 +10,12 @@
     },
     {
       "service_uuid": "aeb23580-80b6-432d-9b5a-57ff6feea94e"
+    },
+    {
+      "local_name": "BUA*"
+    },
+    {
+      "service_uuid": "56484aae-a8eb-4a97-ac19-a8ea6373e05a"
     }
   ],
   "codeowners": ["@cedhuf"],

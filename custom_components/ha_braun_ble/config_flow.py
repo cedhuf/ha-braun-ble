@@ -37,6 +37,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_AUTH_KEY,
     CONF_DEFAULT_PERSON,
+    CONF_DEVICE_USER,
     CONF_ENC_KEY,
     CONF_MODEL,
     CONF_NOTIFY,
@@ -301,51 +302,70 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_people(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Explain attribution and let the user declare people right away."""
+        users = self._profile.device_users
         if user_input is not None:
-            names = [name.strip() for name in user_input.get(CONF_PEOPLE, []) if name.strip()]
+            people = [
+                ({CONF_NAME: name, CONF_DEVICE_USER: user}, name)
+                for user in users
+                if (name := user_input.get(f"user_{user}", "").strip())
+            ] + [({CONF_NAME: name}, name) for name in user_input.get(CONF_PEOPLE, []) if name.strip()]
             return self.async_create_entry(
                 title=self._title,
                 data=self._data,
                 options={CONF_NOTIFY: user_input.get(CONF_NOTIFY, [])},
                 subentries=[
                     ConfigSubentryData(
-                        data={CONF_NAME: name},
-                        subentry_type=SUBENTRY_PERSON,
-                        title=name,
-                        unique_id=None,
+                        data=data, subentry_type=SUBENTRY_PERSON, title=name.strip(), unique_id=None
                     )
-                    for name in names
+                    for data, name in people
                 ],
             )
 
         return self.async_show_form(
-            step_id="people",
+            step_id="people_with_users" if users else "people",
             data_schema=vol.Schema(
                 {
+                    **{vol.Optional(f"user_{user}"): str for user in users},
                     vol.Optional(CONF_PEOPLE): TextSelector(TextSelectorConfig(multiple=True)),
                     vol.Optional(CONF_NOTIFY): _notify_selector(self.hass),
                 }
             ),
         )
 
+    async def async_step_people_with_users(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Same as the people step, for devices with their own user buttons."""
+        return await self.async_step_people(user_input)
+
 
 class PersonSubentryFlow(ConfigSubentryFlow):
     """Add a person measurements can be attributed to."""
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Ask for a name and an optional Home Assistant person."""
+        """Ask for a name, an optional Home Assistant person and, if any, the device user."""
         if user_input is not None:
             return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
 
+        model = SUPPORTED_MODELS.get(self._get_entry().data.get(CONF_MODEL, ""), DEFAULT_MODEL)
+        schema: dict[Any, Any] = {
+            vol.Required(CONF_NAME): str,
+            vol.Optional(CONF_PERSON): EntitySelector(EntitySelectorConfig(domain="person")),
+        }
+        if model.device_users:
+            schema[vol.Optional(CONF_DEVICE_USER)] = SelectSelector(
+                SelectSelectorConfig(options=list(model.device_users))
+            )
         return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_NAME): str,
-                    vol.Optional(CONF_PERSON): EntitySelector(EntitySelectorConfig(domain="person")),
-                }
-            ),
+            step_id="user_with_device_user" if model.device_users else "user",
+            data_schema=vol.Schema(schema),
         )
+
+    async def async_step_user_with_device_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Same as the user step, for devices with their own user buttons."""
+        return await self.async_step_user(user_input)
 
 
 class BraunOptionsFlow(OptionsFlow):

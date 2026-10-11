@@ -47,6 +47,20 @@
           "people": "Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
           "notify": "Téléphones avec l'app Home Assistant. Chaque nouvelle mesure envoie une notification avec un bouton par personne."
         }
+      },
+      "people_with_users": {
+        "title": "Qui utilise ce thermomètre ?",
+        "description": "Ce tensiomètre a ses propres utilisateurs A et B : leurs mesures vont directement à la personne indiquée ici. Les mesures des autres attendent d'être attribuées, par la notification envoyée aux téléphones choisis ci-dessous ou depuis la page de l'appareil.",
+        "data": {
+          "user_A": "Prénom de l'utilisateur A de l'appareil",
+          "user_B": "Prénom de l'utilisateur B de l'appareil",
+          "people": "Personnes",
+          "notify": "Téléphones à qui demander pour qui est chaque mesure"
+        },
+        "data_description": {
+          "people": "Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
+          "notify": "Téléphones avec l'app Home Assistant. Chaque nouvelle mesure envoie une notification avec un bouton par personne."
+        }
       }
     },
     "error": {
@@ -114,6 +128,15 @@
       },
       "firmware": {
         "name": "Firmware"
+      },
+      "systolic": {
+        "name": "Systolique"
+      },
+      "diastolic": {
+        "name": "Diastolique"
+      },
+      "pulse": {
+        "name": "Pouls"
       }
     },
     "button": {
@@ -138,6 +161,18 @@
           "data": {
             "name": "Prénom",
             "person": "Personne Home Assistant (facultatif)"
+          }
+        },
+        "user_with_device_user": {
+          "title": "Ajouter une personne",
+          "description": "Les mesures de cet appareil pourront ensuite être attribuées à cette personne.",
+          "data": {
+            "name": "Prénom",
+            "person": "Personne Home Assistant (facultatif)",
+            "device_user": "Utilisateur de l'appareil"
+          },
+          "data_description": {
+            "device_user": "Bouton utilisateur de l'appareil (A ou B). Ses mesures iront alors directement à cette personne."
           }
         }
       }

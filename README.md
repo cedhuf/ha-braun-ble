@@ -28,6 +28,7 @@ Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and built
 |---|---|---|---|
 | **Braun ThermoScan 7+ Connect (`IRT6575`)** | Ear Thermometer | ✅ Full Support | [@cedhuf](https://github.com/cedhuf) |
 | **Braun ThermoScan 4 Connect (`IRT3575`)** | Ear Thermometer | 🧪 Experimental | Community |
+| **Braun ExactFit 5 Connect (`BUA6350`)** | Blood Pressure Monitor | 🧪 Experimental | [@cedhuf](https://github.com/cedhuf) |
 
 > Have another Braun BLE device? Check our [Contributing Guide](CONTRIBUTING.md) to add your model!
 
@@ -99,6 +100,10 @@ To skip attribution, pick a person under **Attribute every measurement automatic
 
 **Pending measurement is text, not a number**, so it has no graph or statistics: it is a waiting list. Temperature curves live on **Last measurement** (every reading, whoever it was for) and on each person's **Temperature**. Without any person declared, readings are never queued and only **Last measurement** is updated, which is all you need for live use.
 
+**Blood pressure monitors** have their own users A and B. Link each to a person at setup, or with **Device user** when adding a person: their readings then skip the queue. Readings from an unlinked user wait to be attributed like a thermometer's.
+
+**Upgrading from 0.1.8:** person temperature sensors had a state class for one release. Home Assistant then reports that the entity *no longer has a state class*; deleting those old statistics is safe, as the real per-person curve is the `ha_braun_ble:<id>_temperature` statistic.
+
 Events for custom automations: `ha_braun_ble_measurement` (every reading), `ha_braun_ble_attribution` and `ha_braun_ble_ignored`. They also appear in the device activity log.
 
 ### Apple Health (HealthKit)
@@ -111,7 +116,7 @@ See our step-by-step guide in [docs/apple-health-setup.md](docs/apple-health-set
 What is known about each device, with captured bytes and evidence levels:
 
 - [ThermoScan 7+ Connect (IRT6575)](docs/irt6575-support.md): supported.
-- [ExactFit 5 Connect (BUA6350)](docs/bua6350-support.md): research, not supported yet.
+- [ExactFit 5 Connect (BUA6350)](docs/bua6350-support.md): experimental.
 - [Scope policy](docs/scope-policy.md): what the integration will not do, such as firmware updates.
 
 ---

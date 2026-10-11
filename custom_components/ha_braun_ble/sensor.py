@@ -18,7 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SUBENTRY_PERSON
 from .coordinator import BraunDataUpdateCoordinator
-from .kinds import COMMON_SENSORS, BraunSensorDescription
+from .kinds import BraunSensorDescription
 from .messages import text
 
 
@@ -34,7 +34,7 @@ async def async_setup_entry(
 
     kind = coordinator.profile.kind
     async_add_entities(
-        [BraunSensor(coordinator, d) for d in (*kind.device_sensors, *COMMON_SENSORS)]
+        [BraunSensor(coordinator, d) for d in (*kind.device_sensors, *coordinator.profile.common_sensors)]
         + [BraunPendingSensor(coordinator)]
     )
     for person in persons:

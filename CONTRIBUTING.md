@@ -10,12 +10,12 @@ Inspired by [`ha-govee-led-ble`](https://github.com/teh-hippo/ha-govee-led-ble):
 
 | Part | File | Role |
 |---|---|---|
-| Model profile | `models.py` | Exact model id, display name, BLE name prefixes, the protocol's session runner and the measurement kind |
-| Protocol | `protocols/<family>.py` | Pairing data, the Bluetooth session, reading and acknowledging records, decoding them into a record dict |
+| Model profile | `models.py` | Exact model id, display name, BLE name prefixes, advertised service UUID, the protocol's session runner, the measurement kind, an optional `PinPairing`, device users and whether a battery is reported |
+| Protocol | `protocols/<family>.py` | Pairing when needed, the Bluetooth session, reading and acknowledging records, decoding them into a record dict. `thermoscan.py` (encrypted, PIN) and `exactfit.py` (plain, standard blood pressure layout) |
 | Measurement kind | `kinds.py` | Record fields, device and per-person sensors, long-term statistics, the short text used in notifications and the activity log |
 | Core | `coordinator.py`, `sensor.py`, `button.py`, `messages.py`, `logbook.py` | Sessions, people, the attribution queue, notifications, statistics, events |
 
-A protocol session receives the coordinator, a connected `BleakClient` and an `asyncio.Event` set on disconnection. It calls `coordinator.async_add_record(record)` for each measurement, `coordinator.async_synced()` after each batch, and may fill `coordinator.data` with `battery`, `model_number` and `firmware`. A record carries at least `timestamp` (ISO 8601, UTC), the kind's value fields and `raw_hex`.
+A protocol session receives the coordinator, a connected `BleakClient` and an `asyncio.Event` set on disconnection. It calls `coordinator.async_add_record(record)` for each measurement, `coordinator.async_synced()` after each batch, and may fill `coordinator.data` with `battery`, `model_number` and `firmware`. A record carries at least `timestamp` (ISO 8601, UTC), the kind's value fields and `raw_hex`, plus `user` when the device has its own users.
 
 ---
 

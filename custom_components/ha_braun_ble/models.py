@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING
 
 from bleak import BleakClient
 
-from .kinds import TEMPERATURE, MeasurementKind
-from .protocols import thermoscan
+from homeassistant.components.sensor import SensorEntityDescription
+
+from .kinds import BLOOD_PRESSURE, COMMON_SENSORS, TEMPERATURE, MeasurementKind
+from .protocols import exactfit, thermoscan
 
 if TYPE_CHECKING:
     from .coordinator import BraunDataUpdateCoordinator
@@ -43,6 +45,14 @@ class BraunModelProfile:
     run_session: SessionRunner
     kind: MeasurementKind
     pairing: PinPairing | None = None
+    # Users selectable on the device itself, reported with each measurement.
+    device_users: tuple[str, ...] = ()
+    has_battery: bool = True
+
+    @property
+    def common_sensors(self) -> tuple[SensorEntityDescription, ...]:
+        """Return the device sensors every model has, minus a battery it cannot report."""
+        return tuple(d for d in COMMON_SENSORS if d.key != "battery" or self.has_battery)
 
 
 THERMOSCAN_PAIRING = PinPairing(thermoscan.async_request_pin, thermoscan.keys_from_pin)
@@ -67,6 +77,17 @@ SUPPORTED_MODELS: dict[str, BraunModelProfile] = {
             run_session=thermoscan.async_run_session,
             kind=TEMPERATURE,
             pairing=THERMOSCAN_PAIRING,
+        ),
+        BraunModelProfile(
+            model_id="BUA6350",
+            name="Braun ExactFit 5 Connect",
+            ble_name_prefixes=("BUA6350",),
+            service_uuid=exactfit.MEASUREMENT_SERVICE_UUID,
+            run_session=exactfit.async_run_session,
+            kind=BLOOD_PRESSURE,
+            device_users=exactfit.USERS,
+            # The battery characteristic sends 0x82, not a percentage.
+            has_battery=False,
         ),
     )
 }

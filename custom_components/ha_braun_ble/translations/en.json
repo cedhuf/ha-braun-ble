@@ -47,6 +47,20 @@
           "people": "One first name per entry. Leave empty to add people later.",
           "notify": "Phones running the Home Assistant app. Each new measurement sends a notification with one button per person."
         }
+      },
+      "people_with_users": {
+        "title": "Who uses this thermometer?",
+        "description": "This monitor has its own users A and B: their measurements go straight to the person named here. Measurements from other users wait to be attributed, by the notification sent to the phones chosen below or from the device page.",
+        "data": {
+          "user_A": "First name of device user A",
+          "user_B": "First name of device user B",
+          "people": "People",
+          "notify": "Phones asked who each measurement was for"
+        },
+        "data_description": {
+          "people": "One first name per entry. Leave empty to add people later.",
+          "notify": "Phones running the Home Assistant app. Each new measurement sends a notification with one button per person."
+        }
       }
     },
     "error": {
@@ -114,6 +128,15 @@
       },
       "firmware": {
         "name": "Firmware"
+      },
+      "systolic": {
+        "name": "Systolic"
+      },
+      "diastolic": {
+        "name": "Diastolic"
+      },
+      "pulse": {
+        "name": "Pulse"
       }
     },
     "button": {
@@ -138,6 +161,18 @@
           "data": {
             "name": "Name",
             "person": "Home Assistant person (optional)"
+          }
+        },
+        "user_with_device_user": {
+          "title": "Add a person",
+          "description": "Measurements from this device can then be attributed to this person.",
+          "data": {
+            "name": "Name",
+            "person": "Home Assistant person (optional)",
+            "device_user": "Device user"
+          },
+          "data_description": {
+            "device_user": "User button on the device (A or B). Its measurements then go straight to this person."
           }
         }
       }

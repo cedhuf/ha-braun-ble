@@ -1,4 +1,5 @@
 import os
+from zoneinfo import ZoneInfo
 
 import pytest
 from cryptography.exceptions import InvalidTag
@@ -9,6 +10,7 @@ from ha_braun_ble.protocols.kaz_crypto import (
     derive_recovery_key,
     encrypt_frame,
 )
+from ha_braun_ble.protocols.exactfit import parse_record as parse_exactfit_record
 from ha_braun_ble.protocols.thermoscan import parse_record as parse_thermoscan_record
 
 
@@ -86,3 +88,27 @@ def test_parse_age_profile(raw, profile):
 
 def test_parse_short_record_keeps_raw_only():
     assert parse_thermoscan_record(b"\x00\x01") == {"raw_hex": "0001"}
+
+
+PARIS = ZoneInfo("Europe/Paris")
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (
+            "1e740049005a00ea070a0b0f0f005b00000100",
+            {"systolic": 116, "diastolic": 73, "mean_arterial_pressure": 90, "pulse": 91, "user": "A",
+             "timestamp": "2026-10-11T13:15:00+00:00", "body_movement": True},
+        ),
+        (
+            "1e850046005a00ea070a0b0f13005a00010000",
+            {"systolic": 133, "diastolic": 70, "mean_arterial_pressure": 90, "pulse": 90, "user": "B",
+             "timestamp": "2026-10-11T13:19:00+00:00", "body_movement": False},
+        ),
+    ],
+)
+def test_parse_captured_exactfit_records(raw, expected):
+    rec = parse_exactfit_record(bytes.fromhex(raw), PARIS)
+    assert {key: rec[key] for key in expected} == expected
+    assert rec["cuff_too_loose"] is False and rec["irregular_pulse"] is False

@@ -38,6 +38,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
     CONF_DEFAULT_PERSON,
+    CONF_DEVICE_USER,
     CONF_MODEL,
     CONF_NOTIFY,
     DOMAIN,
@@ -54,8 +55,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _record_id(record: dict[str, Any]) -> str:
-    """Identify a measurement by its time and, when the device has one, its sequence number."""
-    return f"{int(datetime.fromisoformat(record['timestamp']).timestamp())}_{record.get('sequence', '')}"
+    """Identify a measurement by its time and its sequence number or device user."""
+    suffix = record.get("sequence", record.get("user", ""))
+    return f"{int(datetime.fromisoformat(record['timestamp']).timestamp())}_{suffix}"
 
 
 class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -187,8 +189,12 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if kind.is_measurement(record):
             persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
             default = self.entry.subentries.get(self.entry.options.get(CONF_DEFAULT_PERSON) or "")
-            if default:
-                await self._async_attribute(record, default)
+            linked = next(
+                (p for p in persons if record.get("user") and p.data.get(CONF_DEVICE_USER) == record["user"]),
+                None,
+            )
+            if linked or default:
+                await self._async_attribute(record, linked or default)
             elif persons:
                 record["id"] = _record_id(record)
                 self.pending.append(record)
