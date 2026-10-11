@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connecter un appareil Braun BLE",
+        "description": "Sélectionnez un appareil Braun détecté ou configurez la connexion manuellement.",
+        "data": {
+          "address": "Appareil Bluetooth",
+          "setup_mode": "Mode d'installation"
+        }
+      },
+      "pairing_prompt": {
+        "title": "Mettre l'appareil en mode appairage",
+        "description": "1. Assurez-vous que le thermomètre est **éteint**.\n2. **Maintenez le bouton d'alimentation enfoncé** pendant environ 5 secondes jusqu'à ce que l'écran devienne **BLEU** avec l'icône Bluetooth et **'bt'** qui clignote.\n3. Une fois l'écran bleu actif, cliquez sur **Soumettre** ci-dessous.\n\n*(Le thermomètre affichera un code PIN à 6 chiffres sur son écran)*."
+      },
+      "enter_pin": {
+        "title": "Saisir le code PIN d'appairage",
+        "description": "Entrez le code à 6 chiffres affiché sur l'écran du thermomètre :",
+        "data": {
+          "pin": "Code PIN à 6 chiffres"
+        }
+      },
+      "manual_keys": {
+        "title": "Configuration manuelle des clés",
+        "description": "Saisissez directement les clés d'authentification et de chiffrement :",
+        "data": {
+          "address": "Adresse MAC Bluetooth",
+          "auth_key": "Clé d'authentification (32 caractères hexadécimaux)",
+          "enc_key": "Clé de chiffrement (32 caractères hexadécimaux)",
+          "model": "Modèle d'appareil"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter à l'appareil. Assurez-vous qu'il est allumé en mode appairage (écran bleu avec 'bt' qui clignote).",
+      "pairing_timeout": "Délai d'attente dépassé pour recevoir la trame d'appairage de l'appareil.",
+      "pairing_failed": "Échec de l'échange d'appairage.",
+      "invalid_pin": "Le code PIN doit comporter exactement 6 chiffres numériques.",
+      "pin_decrypt_failed": "Échec du déchiffrement des clés avec ce code PIN. Vérifiez les 6 chiffres et réessayez.",
+      "invalid_key_length": "Les clés doivent comporter 32 caractères hexadécimaux (16 octets)."
+    },
+    "abort": {
+      "already_configured": "Cet appareil Braun est déjà configuré."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Température"
+      },
+      "battery": {
+        "name": "Batterie"
+      },
+      "stored_records": {
+        "name": "Mesures en mémoire"
+      }
+    }
+  }
+}
