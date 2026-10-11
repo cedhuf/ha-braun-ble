@@ -1,14 +1,6 @@
 {
   "domain": "ha_braun_ble",
   "name": "Braun Health BLE",
-  "codeowners": ["@cedhuf"],
-  "config_flow": true,
-  "documentation": "https://github.com/cedhuf/ha-braun-ble",
-  "integration_type": "device",
-  "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/cedhuf/ha-braun-ble/issues",
-  "dependencies": ["bluetooth"],
-  "requirements": ["bleak-retry-connector>=3.0.0"],
   "bluetooth": [
     {
       "local_name": "TS7*"
@@ -26,5 +18,13 @@
       "local_name": "BPM*"
     }
   ],
+  "codeowners": ["@cedhuf"],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/cedhuf/ha-braun-ble",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/cedhuf/ha-braun-ble/issues",
+  "requirements": ["bleak-retry-connector>=3.0.0"],
   "version": "0.1.1"
 }
