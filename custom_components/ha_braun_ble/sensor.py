@@ -6,13 +6,10 @@ from typing import Any
 
 from homeassistant.components.sensor import (
     RestoreSensor,
-    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
-    SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
@@ -21,43 +18,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SUBENTRY_PERSON
 from .coordinator import BraunDataUpdateCoordinator
+from .kinds import COMMON_SENSORS, BraunSensorDescription
 from .messages import text
 
-TEMPERATURE = SensorEntityDescription(
-    key="temperature",
-    translation_key="temperature",
-    device_class=SensorDeviceClass.TEMPERATURE,
-    state_class=SensorStateClass.MEASUREMENT,
-    native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-    icon="mdi:thermometer",
-)
-BATTERY = SensorEntityDescription(
-    key="battery",
-    translation_key="battery",
-    device_class=SensorDeviceClass.BATTERY,
-    state_class=SensorStateClass.MEASUREMENT,
-    native_unit_of_measurement=PERCENTAGE,
-)
-
-
-AMBIENT_TEMPERATURE = SensorEntityDescription(
-    key="ambient_temperature",
-    translation_key="ambient_temperature",
-    device_class=SensorDeviceClass.TEMPERATURE,
-    state_class=SensorStateClass.MEASUREMENT,
-    native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-    entity_registry_enabled_default=False,
-)
-MODEL_NUMBER = SensorEntityDescription(
-    key="model_number",
-    translation_key="model_number",
-    entity_category=EntityCategory.DIAGNOSTIC,
-)
-FIRMWARE = SensorEntityDescription(
-    key="firmware",
-    translation_key="firmware",
-    entity_category=EntityCategory.DIAGNOSTIC,
-)
 
 
 async def async_setup_entry(
@@ -69,19 +32,14 @@ async def async_setup_entry(
     coordinator: BraunDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     persons = entry.get_subentries_of_type(SUBENTRY_PERSON)
 
+    kind = coordinator.profile.kind
     async_add_entities(
-        [
-            BraunTemperatureSensor(coordinator, TEMPERATURE),
-            BraunSensor(coordinator, BATTERY),
-            BraunSensor(coordinator, AMBIENT_TEMPERATURE),
-            BraunSensor(coordinator, MODEL_NUMBER),
-            BraunSensor(coordinator, FIRMWARE),
-            BraunPendingSensor(coordinator),
-        ]
+        [BraunSensor(coordinator, d) for d in (*kind.device_sensors, *COMMON_SENSORS)]
+        + [BraunPendingSensor(coordinator)]
     )
     for person in persons:
         async_add_entities(
-            [BraunPersonTemperatureSensor(coordinator, person)],
+            [BraunPersonSensor(coordinator, person, d) for d in kind.person_sensors],
             config_subentry_id=person.subentry_id,
         )
 
@@ -122,35 +80,38 @@ class BraunSensor(CoordinatorEntity[BraunDataUpdateCoordinator], RestoreSensor):
         return self.coordinator.data.get(self.entity_description.key)
 
 
-class BraunTemperatureSensor(BraunSensor):
-    """Temperature sensor carrying metadata from the latest measurement."""
-
     @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional metadata from the latest measurement."""
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the latest record's details, for sensors that ask for them."""
+        description = self.entity_description
+        if not (isinstance(description, BraunSensorDescription) and description.record_attributes):
+            return None
         rec = self.coordinator.data.get("latest_record") or {}
         return {
             "measured_at": rec.get("timestamp"),
-            "ambient_temperature": rec.get("ambient_temperature"),
+            **{key: rec.get(key) for key in self.coordinator.profile.kind.attributes},
             "sequence": rec.get("sequence"),
             "last_synced": self.coordinator.data.get("last_synced"),
             "raw_hex": rec.get("raw_hex"),
         }
 
 
-class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator], RestoreSensor):
-    """Latest temperature attributed to one person, kept across restarts."""
+class BraunPersonSensor(CoordinatorEntity[BraunDataUpdateCoordinator], RestoreSensor):
+    """Latest value attributed to one person, kept across restarts."""
 
     _attr_has_entity_name = True
-    _attr_translation_key = "person_temperature"
-    _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
-    def __init__(self, coordinator: BraunDataUpdateCoordinator, person: ConfigSubentry) -> None:
-        """Initialize the person's temperature sensor."""
+    def __init__(
+        self,
+        coordinator: BraunDataUpdateCoordinator,
+        person: ConfigSubentry,
+        description: SensorEntityDescription,
+    ) -> None:
+        """Initialize the person's sensor."""
         super().__init__(coordinator)
+        self.entity_description = description
         self._person_id = person.subentry_id
-        self._attr_unique_id = f"{person.subentry_id}_temperature"
+        self._attr_unique_id = f"{person.subentry_id}_{description.key}"
         # Subentry entities must sit on a device of their own subentry.
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, person.subentry_id)},
@@ -168,8 +129,12 @@ class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator]
         ):
             self._attr_native_value = data.native_value
             self._attr_extra_state_attributes = {
-                key: state.attributes.get(key) for key in ("measured_at", "ambient_temperature")
+                key: state.attributes.get(key) for key in ("measured_at", *self._kind_attributes)
             }
+
+    @property
+    def _kind_attributes(self) -> tuple[str, ...]:
+        return self.coordinator.profile.kind.attributes
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -177,10 +142,10 @@ class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator]
         record = self.coordinator.data["persons"].get(self._person_id)
         shown = self._attr_extra_state_attributes["measured_at"]
         if record and (shown is None or record["timestamp"] >= shown):
-            self._attr_native_value = record["temperature"]
+            self._attr_native_value = record[self.entity_description.key]
             self._attr_extra_state_attributes = {
                 "measured_at": record["timestamp"],
-                "ambient_temperature": record["ambient_temperature"],
+                **{key: record.get(key) for key in self._kind_attributes},
             }
         super()._handle_coordinator_update()
 
@@ -199,7 +164,7 @@ class BraunPendingSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEn
 
     @property
     def native_value(self) -> str | None:
-        """Return the oldest pending temperature and when it was taken."""
+        """Return the oldest pending measurement and when it was taken."""
         if not self.coordinator.pending:
             return None
         return text(self.hass, "pending_value", self.coordinator.pending[0])
@@ -208,9 +173,10 @@ class BraunPendingSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEn
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the raw values and how many measurements are waiting."""
         oldest = self.coordinator.pending[0] if self.coordinator.pending else {}
+        kind = self.coordinator.profile.kind
         return {
-            "temperature": oldest.get("temperature"),
+            **{key: oldest.get(key) for key in kind.value_fields},
             "measured_at": oldest.get("timestamp"),
-            "ambient_temperature": oldest.get("ambient_temperature"),
+            **{key: oldest.get(key) for key in kind.attributes},
             "waiting": len(self.coordinator.pending),
         }

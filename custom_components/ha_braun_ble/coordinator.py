@@ -1,17 +1,19 @@
-"""DataUpdateCoordinator for Braun BLE devices."""
+"""Coordinator: Bluetooth sessions, people, attribution queue and notifications.
+
+Nothing here depends on a model: protocols hand records over and kinds describe them.
+"""
 
 from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
 import logging
-import os
 from typing import Any
 
 from bleak import BleakClient
 from bleak_retry_connector import establish_connection
 
-from homeassistant.components import bluetooth
+from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
     BluetoothChange,
@@ -29,91 +31,35 @@ from homeassistant.components.recorder.statistics import (
     statistics_during_period,
 )
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
-from homeassistant.const import UnitOfTemperature
-from homeassistant.components import persistent_notification
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
-    ACK_OLDEST_RECORD,
-    BATTERY_LEVEL_UUID,
-    CHALLENGE_REQUEST_UUID,
-    CHALLENGE_RESPONSE_UUID,
-    CONF_AUTH_KEY,
     CONF_DEFAULT_PERSON,
-    CONF_ENC_KEY,
     CONF_MODEL,
     CONF_NOTIFY,
     DOMAIN,
     EVENT_BRAUN_ATTRIBUTION,
     EVENT_BRAUN_IGNORED,
     EVENT_BRAUN_MEASUREMENT,
-    FINAL_TEMP_NOTIFICATION_UUID,
-    FIRMWARE_REVISION_UUID,
-    MODEL_NUMBER_UUID,
-    READ_OLDEST_RECORD,
-    RECORD_COUNT_UUID,
-    RECORD_INDEX_REQUEST_UUID,
-    RECORD_NOTIFICATION_UUID,
     SUBENTRY_PERSON,
 )
-from .crypto import (
-    compute_challenge_response,
-    decrypt_frame,
-    encrypt_frame,
-)
+from .kinds import Statistic
 from .messages import text
 from .models import BraunModelProfile, SUPPORTED_MODELS, get_model_profile_by_name
 
 _LOGGER = logging.getLogger(__name__)
 
 
-SESSION_TIMEOUT = 300
-
-
 def _record_id(record: dict[str, Any]) -> str:
-    """Identify a measurement by its time and the device sequence number."""
-    return f"{int(datetime.fromisoformat(record['timestamp']).timestamp())}_{record['sequence']}"
-
-
-class _RecordSync:
-    """Encrypted record commands for one authenticated session."""
-
-    def __init__(
-        self, client: BleakClient, key: bytes, iv: bytes, records: asyncio.Queue[bytes]
-    ) -> None:
-        self._client = client
-        self._key = key
-        self._iv = iv
-        self._records = records
-        self._counter = 1
-
-    async def pending(self) -> int:
-        """Return the number of measurements not yet synced (second byte)."""
-        frame = await self._client.read_gatt_char(RECORD_COUNT_UUID)
-        return decrypt_frame(frame, self._key, self._iv)[1]
-
-    async def read_oldest(self) -> bytes:
-        """Return the decrypted oldest new record."""
-        await self._send(READ_OLDEST_RECORD)
-        frame = await asyncio.wait_for(self._records.get(), timeout=3.5)
-        return decrypt_frame(frame, self._key, self._iv)
-
-    async def ack_oldest(self) -> None:
-        """Mark the oldest new record as synced; the next one moves to index 0."""
-        await self._send(ACK_OLDEST_RECORD)
-
-    async def _send(self, command: bytes) -> None:
-        self._counter += 1
-        req = encrypt_frame(command, self._key, self._iv, self._counter)
-        await self._client.write_gatt_char(RECORD_INDEX_REQUEST_UUID, req, response=True)
+    """Identify a measurement by its time and, when the device has one, its sequence number."""
+    return f"{int(datetime.fromisoformat(record['timestamp']).timestamp())}_{record.get('sequence', '')}"
 
 
 class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Coordinator managing Braun BLE connection, crypto handshake and record syncing."""
+    """One Braun device: its sessions, its people and the measurements waiting for them."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize coordinator."""
@@ -124,8 +70,6 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.entry = entry
         self.address: str = entry.unique_id or entry.data["address"]
-        self.auth_key: bytes = bytes.fromhex(entry.data[CONF_AUTH_KEY])
-        self.enc_key: bytes = bytes.fromhex(entry.data[CONF_ENC_KEY])
 
         model_id = entry.data.get(CONF_MODEL, "IRT6575")
         self.profile: BraunModelProfile = SUPPORTED_MODELS.get(
@@ -141,7 +85,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # In-memory sensor state cache
         self.data: dict[str, Any] = {
-            "temperature": None,
+            **dict.fromkeys(d.key for d in self.profile.kind.device_sensors),
             "battery": None,
             "last_synced": None,
             "latest_record": {},
@@ -188,7 +132,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self.data
 
     async def async_sync_device(self) -> None:
-        """Stay connected while the thermometer is on, syncing each new measurement."""
+        """Stay connected while the device is on, syncing each new measurement."""
         if self._sync_lock.locked():
             _LOGGER.debug("Session already open with %s, skipping", self.address)
             return
@@ -197,12 +141,12 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 await self._async_run_session()
             finally:
-                # The thermometer sends the same advertisement at every power-on, which
+                # The devices send the same advertisement at every power-on, which
                 # Home Assistant drops as unchanged unless the history is cleared.
                 bluetooth.async_clear_advertisement_history(self.hass, self.address)
 
     async def _async_run_session(self) -> None:
-        """Connect, sync pending records, then sync again on every final temperature."""
+        """Connect and let the model's protocol run the session until the device disconnects."""
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, self.address, connectable=True
         )
@@ -210,17 +154,14 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("Device %s not available in BLE cache", self.address)
             return
 
-        # True: a measurement was just taken. False: the device disconnected.
-        wakeups: asyncio.Queue[bool] = asyncio.Queue()
-        records: asyncio.Queue[bytes] = asyncio.Queue()
-
+        disconnected = asyncio.Event()
         _LOGGER.info("Connecting to Braun device %s...", self.address)
         try:
             client = await establish_connection(
                 BleakClient,
                 ble_device,
                 self.entry.title,
-                disconnected_callback=lambda _client: wakeups.put_nowait(False),
+                disconnected_callback=lambda _client: disconnected.set(),
                 max_attempts=2,
             )
         except Exception as err:
@@ -228,35 +169,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         try:
-            await client.start_notify(
-                RECORD_NOTIFICATION_UUID, lambda _char, data: records.put_nowait(bytes(data))
-            )
-            await client.start_notify(
-                FINAL_TEMP_NOTIFICATION_UUID, lambda _char, _data: wakeups.put_nowait(True)
-            )
-            session_iv = os.urandom(12)
-            challenge = await client.read_gatt_char(CHALLENGE_REQUEST_UUID)
-            resp = compute_challenge_response(challenge, self.auth_key, session_iv)
-            await client.write_gatt_char(CHALLENGE_RESPONSE_UUID, resp, response=True)
-            _LOGGER.debug("Authenticated with %s", self.address)
-
-            battery = await client.read_gatt_char(BATTERY_LEVEL_UUID)
-            self.data["battery"] = battery[0]
-            self.data["model_number"] = (await client.read_gatt_char(MODEL_NUMBER_UUID)).decode()
-            self.data["firmware"] = (await client.read_gatt_char(FIRMWARE_REVISION_UUID)).decode()
-
-            sync = _RecordSync(client, self.enc_key, session_iv, records)
-            await self._async_sync_pending(sync)
-            # The device turns itself off about a minute after the last measurement.
-            while True:
-                try:
-                    measured = await asyncio.wait_for(wakeups.get(), timeout=SESSION_TIMEOUT)
-                except TimeoutError:
-                    _LOGGER.debug("Session with %s timed out", self.address)
-                    break
-                if not measured:
-                    break
-                await self._async_sync_pending(sync)
+            await self.profile.run_session(self, client, disconnected)
         except Exception as err:
             if client.is_connected:
                 _LOGGER.warning("Sync failed with device %s: %s", self.address, err, exc_info=True)
@@ -267,30 +180,30 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 pass
         _LOGGER.debug("Session with %s closed", self.address)
 
-    async def _async_sync_pending(self, sync: _RecordSync) -> None:
-        """Read, publish and acknowledge every measurement not yet synced."""
-        pending = await sync.pending()
-        _LOGGER.debug("Device has %d new records", pending)
-        for _ in range(pending):
-            record = self.profile.record_parser(await sync.read_oldest())
-            if "temperature" in record:
-                persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
-                default = self.entry.subentries.get(self.entry.options.get(CONF_DEFAULT_PERSON) or "")
-                if default:
-                    await self._async_attribute(record, default)
-                elif persons:
-                    record["id"] = _record_id(record)
-                    self.pending.append(record)
-                    await self._store.async_save(self.pending)
-                    self._async_update_pending_notification()
-                    await self._async_notify_phones(record, persons)
-            self._async_dispatch_measurement_event(record)
-            self.data["latest_record"] = record
-            if "temperature" in record:
-                self.data["temperature"] = record["temperature"]
-                self.data["ambient_temperature"] = record["ambient_temperature"]
-            await sync.ack_oldest()
+    async def async_add_record(self, record: dict[str, Any]) -> None:
+        """Take a record from the protocol: attribute or queue it, then publish it."""
+        kind = self.profile.kind
+        record["kind"] = kind.key
+        if kind.is_measurement(record):
+            persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
+            default = self.entry.subentries.get(self.entry.options.get(CONF_DEFAULT_PERSON) or "")
+            if default:
+                await self._async_attribute(record, default)
+            elif persons:
+                record["id"] = _record_id(record)
+                self.pending.append(record)
+                await self._store.async_save(self.pending)
+                self._async_update_pending_notification()
+                await self._async_notify_phones(record, persons)
+        self._async_dispatch_measurement_event(record)
+        self.data["latest_record"] = record
+        if kind.is_measurement(record):
+            for description in kind.device_sensors:
+                self.data[description.key] = record[description.key]
 
+    @callback
+    def async_synced(self) -> None:
+        """Note the end of a sync and refresh the entities."""
         self.data["last_synced"] = datetime.now().isoformat()
         self.async_set_updated_data(self.data)
 
@@ -373,9 +286,14 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._async_fire(EVENT_BRAUN_ATTRIBUTION, person.subentry_id, record)
 
         # Statistics carry the real measurement time, unlike state history.
-        statistic_id = f"{DOMAIN}:{person.subentry_id.lower()}_temperature"
-        value = record["temperature"]
         hour = datetime.fromisoformat(record["timestamp"]).replace(minute=0, second=0, microsecond=0)
+        for statistic in self.profile.kind.statistics:
+            await self._async_add_statistic(person, statistic, hour, record[statistic.field])
+
+    async def _async_add_statistic(
+        self, person: ConfigSubentry, statistic: Statistic, hour: datetime, value: float
+    ) -> None:
+        statistic_id = f"{DOMAIN}:{person.subentry_id.lower()}_{statistic.field}"
         existing = await get_instance(self.hass).async_add_executor_job(
             statistics_during_period,
             self.hass,
@@ -396,11 +314,11 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             StatisticMetaData(
                 mean_type=StatisticMeanType.ARITHMETIC,
                 has_sum=False,
-                name=f"{person.title} {self.entry.title}",
+                name=f"{person.title} {self.entry.title}{statistic.name_suffix}",
                 source=DOMAIN,
                 statistic_id=statistic_id,
-                unit_class=TemperatureConverter.UNIT_CLASS,
-                unit_of_measurement=UnitOfTemperature.CELSIUS,
+                unit_class=statistic.unit_class,
+                unit_of_measurement=statistic.unit,
             ),
             [StatisticData(start=hour, mean=mean, min=low, max=high)],
         )

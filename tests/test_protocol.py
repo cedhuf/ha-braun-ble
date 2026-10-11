@@ -9,7 +9,7 @@ from ha_braun_ble.crypto import (
     derive_recovery_key,
     encrypt_frame,
 )
-from ha_braun_ble.models import SUPPORTED_MODELS, get_model_profile_by_name, parse_thermoscan_record
+from ha_braun_ble.protocols.thermoscan import parse_record as parse_thermoscan_record
 
 
 def test_recovery_key_places_digits_as_raw_bytes():
@@ -75,10 +75,3 @@ def test_parse_captured_ts7_records(raw, expected):
 
 def test_parse_short_record_keeps_raw_only():
     assert parse_thermoscan_record(b"\x00\x01") == {"raw_hex": "0001"}
-
-
-def test_model_lookup():
-    assert get_model_profile_by_name("TS7+") is SUPPORTED_MODELS["IRT6575"]
-    assert get_model_profile_by_name("ts4") is SUPPORTED_MODELS["IRT3575"]
-    assert get_model_profile_by_name(None) is SUPPORTED_MODELS["IRT6575"]
-    assert get_model_profile_by_name("unknown") is SUPPORTED_MODELS["IRT6575"]

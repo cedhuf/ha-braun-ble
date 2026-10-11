@@ -6,7 +6,7 @@
 
 A Home Assistant custom integration for **Braun connected health devices** over local Bluetooth Low Energy (BLE), requiring **no cloud** and **no mobile app accounts**.
 
-Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and designed with an extensible profile architecture to support additional Braun BLE hardware (ThermoScan 4, ExactFit Blood Pressure Monitors).
+Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and built so that each Braun model is a self-contained profile (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ---
 
@@ -28,8 +28,6 @@ Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and desig
 |---|---|---|---|
 | **Braun ThermoScan 7+ Connect (`IRT6575`)** | Ear Thermometer | ✅ Full Support | [@cedhuf](https://github.com/cedhuf) |
 | **Braun ThermoScan 4 Connect (`IRT3575`)** | Ear Thermometer | 🧪 Experimental | Community |
-| **Braun ExactFit 5 Connect (`BPU5000`)** | Blood Pressure Monitor | 🚧 Profile Ready (Stub) | Contributions welcome |
-| **Braun ExactFit 3 Connect (`BP6500`)** | Blood Pressure Monitor | 🚧 Profile Ready (Stub) | Contributions welcome |
 
 > Have another Braun BLE device? Check our [Contributing Guide](CONTRIBUTING.md) to add your model!
 

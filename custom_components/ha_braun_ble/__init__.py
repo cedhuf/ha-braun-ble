@@ -11,6 +11,7 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 
 from .const import DOMAIN, SUBENTRY_PERSON
 from .coordinator import BraunDataUpdateCoordinator
+from .kinds import COMMON_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_setup()
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
-    _async_remove_stale_entities(hass, entry, coordinator.address)
+    _async_remove_stale_entities(hass, entry, coordinator)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
@@ -47,19 +48,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-def _async_remove_stale_entities(hass: HomeAssistant, entry: ConfigEntry, address: str) -> None:
+def _async_remove_stale_entities(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: BraunDataUpdateCoordinator
+) -> None:
     """Drop entities from earlier versions or from removed people."""
-    expected = {f"{address}_{key}" for key in (
-        "temperature",
-        "battery",
-        "ambient_temperature",
-        "model_number",
-        "firmware",
-        "pending",
-        "ignore",
-    )}
+    kind = coordinator.profile.kind
+    device_keys = [d.key for d in kind.device_sensors] + [d.key for d in COMMON_SENSORS]
+    expected = {f"{coordinator.address}_{key}" for key in (*device_keys, "pending", "ignore")}
     for person in entry.get_subentries_of_type(SUBENTRY_PERSON):
-        expected |= {f"{person.subentry_id}_temperature", f"{person.subentry_id}_assign"}
+        expected |= {f"{person.subentry_id}_{d.key}" for d in kind.person_sensors}
+        expected.add(f"{person.subentry_id}_assign")
     ent_reg = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
         if entity.unique_id not in expected:
