@@ -4,6 +4,8 @@
 [![GitHub Release](https://img.shields.io/github/v/release/cedhuf/ha-braun-ble?color=blue)](https://github.com/cedhuf/ha-braun-ble/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+**[Project page](https://cedhuf.github.io/ha-braun-ble/)**
+
 A Home Assistant custom integration for **Braun connected health devices** over local Bluetooth Low Energy (BLE), requiring **no cloud** and **no mobile app accounts**.
 
 Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and built so that each Braun model is a self-contained profile (see [CONTRIBUTING.md](CONTRIBUTING.md)).

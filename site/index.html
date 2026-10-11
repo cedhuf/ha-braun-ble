@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Braun Health BLE for Home Assistant</title>
+<meta name="description" content="Local Bluetooth integration for Braun connected thermometers and blood pressure monitors in Home Assistant. No cloud, no account.">
+<link rel="icon" href="assets/icon.png">
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --bg-2: #ecebe5;
+    --surface: #ffffff;
+    --ink: #121212;
+    --muted: #5d5c57;
+    --line: rgba(18, 18, 18, .1);
+    --accent: #e8571e;
+    --accent-2: #f4a03a;
+    --glow: rgba(232, 87, 30, .18);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 20px 50px -12px rgba(30, 20, 10, .22);
+    --header: rgba(246, 245, 241, .72);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0d0c;
+      --bg-2: #161614;
+      --surface: #1b1b19;
+      --ink: #f1f0ea;
+      --muted: #a09f97;
+      --line: rgba(241, 240, 234, .1);
+      --accent: #ff6a2b;
+      --accent-2: #ffb04a;
+      --glow: rgba(255, 106, 43, .22);
+      --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 24px 60px -12px rgba(0, 0, 0, .7);
+      --header: rgba(13, 13, 12, .7);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 17px/1.6 "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--header);
+    backdrop-filter: saturate(180%) blur(16px);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid var(--line);
+  }
+  header .wrap { height: 64px; display: flex; align-items: center; justify-content: space-between; }
+  .mark { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; text-decoration: none; }
+  .mark img { width: 30px; height: 30px; border-radius: 8px; }
+  nav { display: flex; align-items: center; gap: 24px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 15px; transition: color .15s; }
+  nav a:hover { color: var(--ink); }
+  nav .gh { color: var(--ink); border: 1px solid var(--line); padding: 7px 14px; border-radius: 999px; }
+
+  .hero { position: relative; padding: 88px 0 64px; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: -120px -20% auto; height: 640px; z-index: -1;
+    background:
+      radial-gradient(40% 50% at 25% 35%, var(--glow), transparent 70%),
+      radial-gradient(35% 45% at 80% 20%, rgba(244, 160, 58, .14), transparent 70%);
+    filter: blur(10px);
+  }
+  .hero-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+    padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #2e9b57; box-shadow: 0 0 0 4px rgba(46, 155, 87, .18); }
+  h1 { font-size: clamp(40px, 5.6vw, 68px); line-height: 1.02; letter-spacing: -.035em; margin: 22px 0 22px; font-weight: 800; }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(100deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lead { font-size: 20px; color: var(--muted); max-width: 36ch; margin: 0 0 34px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 999px;
+    text-decoration: none; font-weight: 600; font-size: 15px; border: 1px solid var(--line); background: var(--surface);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn.primary { background: linear-gradient(100deg, var(--accent), var(--accent-2)); color: #fff; border: 0; }
+  .stats { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 40px; }
+  .stats div { font-size: 14px; color: var(--muted); }
+  .stats b { display: block; font-size: 26px; color: var(--ink); letter-spacing: -.02em; }
+
+  .showcase { position: relative; padding-bottom: 48px; }
+  .shot { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--line); }
+  .shot img { display: block; width: 100%; height: auto; }
+  .showcase .float {
+    position: absolute; width: 58%; right: -6%; bottom: 0;
+    transform: rotate(1.5deg); border-radius: 14px;
+  }
+  figure { margin: 0; }
+  figcaption { font-size: 14px; color: var(--muted); margin-top: 12px; }
+
+  section { padding: 96px 0; }
+  section.alt { background: var(--bg-2); }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  h2 { font-size: clamp(30px, 3.8vw, 44px); letter-spacing: -.03em; line-height: 1.08; margin: 12px 0 16px; font-weight: 800; }
+  .intro { color: var(--muted); max-width: 60ch; margin: 0 0 48px; font-size: 18px; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 28px; }
+  .card svg { width: 40px; height: 40px; padding: 9px; border-radius: 12px; background: var(--glow); color: var(--accent); margin-bottom: 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 19px; letter-spacing: -.01em; }
+  .card p { margin: 0; color: var(--muted); font-size: 16px; }
+
+  .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: center; }
+  .split.reverse > :first-child { order: 2; }
+  .stack { display: grid; gap: 20px; }
+  ul.plain { padding: 0; list-style: none; margin: 0; display: grid; gap: 14px; }
+  ul.plain li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+  ul.plain li::before {
+    content: ""; width: 22px; height: 22px; margin-top: 3px; border-radius: 50%;
+    background: var(--glow) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e8571e' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center / 12px no-repeat;
+  }
+  ul.plain strong { display: block; }
+  ul.plain span { color: var(--muted); }
+
+  .devices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .device { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px; text-decoration: none; display: block; transition: transform .15s, box-shadow .15s; }
+  a.device:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .device small { color: var(--muted); display: block; margin-bottom: 6px; }
+  .device b { font-size: 18px; letter-spacing: -.01em; display: block; margin-bottom: 14px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .status.ok::before { background: #2e9b57; }
+  .status.exp::before { background: var(--accent); }
+
+  ol.install { padding: 0; margin: 0; list-style: none; counter-reset: s; display: grid; gap: 16px; }
+  ol.install li { counter-increment: s; display: grid; grid-template-columns: 36px 1fr; gap: 14px; align-items: start; }
+  ol.install li::before {
+    content: counter(s); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 14px; background: var(--ink); color: var(--bg);
+  }
+  code { font: 14px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface); border: 1px solid var(--line); padding: 2px 6px; border-radius: 6px; }
+
+  .cta { text-align: center; padding: 96px 0; }
+  .cta h2 { margin-bottom: 28px; }
+  .cta .actions { justify-content: center; }
+
+  footer { padding: 40px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer p { margin: 4px 0; }
+
+  @media (max-width: 900px) {
+    .hero-grid, .split { grid-template-columns: 1fr; gap: 40px; }
+    .split.reverse > :first-child { order: 0; }
+    .cards, .devices { grid-template-columns: 1fr; }
+    nav a:not(.gh) { display: none; }
+    section { padding: 64px 0; }
+    .hero { padding-top: 56px; }
+    .showcase .float { right: -2%; width: 64%; }
+  }
+  @media (max-width: 520px) {
+    .wrap { padding: 0 16px; }
+    .stats { gap: 20px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="mark" href="#"><img src="assets/icon.png" alt="">Braun Health BLE</a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#people">People</a>
+      <a href="#devices">Devices</a>
+      <a href="#install">Install</a>
+      <a class="gh" href="https://github.com/cedhuf/ha-braun-ble">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="pill"><i></i>Home Assistant integration, 100% local</span>
+      <h1>Every Braun reading, <em>filed for the right person.</em></h1>
+      <p class="lead">Thermometers and blood pressure monitors sync over Bluetooth the second you measure. No cloud, no account, no app in the middle.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cedhuf&amp;repository=ha-braun-ble&amp;category=integration">Add with HACS</a>
+        <a class="btn" href="https://github.com/cedhuf/ha-braun-ble">View on GitHub</a>
+      </div>
+      <div class="stats">
+        <div><b>&lt; 1 s</b>from measure to Home Assistant</div>
+        <div><b>0</b>cloud calls</div>
+        <div><b>2</b>device families</div>
+      </div>
+    </div>
+    <div class="showcase">
+      <div class="shot"><img src="assets/thermometer.png" alt="ThermoScan 7+ device page in Home Assistant with last measurement, age profile, battery and pending measurement" width="1404" height="840"></div>
+      <div class="shot float"><img src="assets/pending.png" alt="Home Assistant notification listing Braun measurements to attribute" width="940" height="420"></div>
+    </div>
+  </div>
+</div>
+
+<section id="how" class="alt">
+  <div class="wrap">
+    <div class="kicker">How it works</div>
+    <h2>Take a reading. It is already there.</h2>
+    <p class="intro">Home Assistant connects as soon as the device wakes up and stays with it while it is on, through any Bluetooth adapter or ESPHome Bluetooth proxy.</p>
+    <div class="cards">
+      <div class="card">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+        <h3>Measure as usual</h3>
+        <p>Use the thermometer or the monitor exactly as before. Nothing to press, no phone to unlock.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <h3>Synced live</h3>
+        <p>Each reading arrives within a second, with its real time. Readings taken out of range come in at the next power-on.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>
+        <h3>History that makes sense</h3>
+        <p>Per-person sensors and long-term statistics, dated when the reading was taken, not when it was filed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="people">
+  <div class="wrap split">
+    <div>
+      <div class="kicker">People</div>
+      <h2>Who was it for?</h2>
+      <p class="intro">A thermometer cannot tell who was measured, so its readings wait to be attributed. A blood pressure monitor knows its user buttons and routes readings by itself.</p>
+      <ul class="plain">
+        <li><div><strong>On your phone</strong><span>One notification per reading, with a button per person.</span></div></li>
+        <li><div><strong>In Home Assistant</strong><span>Waiting readings are listed in notifications and filed from the device page, even the next day.</span></div></li>
+        <li><div><strong>Automatically</strong><span>Buttons A and B of a monitor go straight to their person; a shared button asks every time.</span></div></li>
+      </ul>
+    </div>
+    <figure>
+      <div class="shot"><img src="assets/person.png" alt="A person's device page with their temperature and an activity log of attributed readings" width="1568" height="779" loading="lazy"></div>
+      <figcaption>Each person is a device of their own, with every attribution in its activity log.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap split reverse">
+    <div>
+      <div class="kicker">Setup</div>
+      <h2>Ready in under a minute.</h2>
+      <p class="intro">Devices are discovered on their own. Thermometers pair with the six-digit PIN they display; blood pressure monitors need no pairing at all. People are declared in the same flow.</p>
+      <ul class="plain">
+        <li><div><strong>A named button</strong><span>sends its readings straight to that person.</span></div></li>
+        <li><div><strong>A button without a name</strong><span>asks among everyone declared: a shared monitor, a guest.</span></div></li>
+        <li><div><strong>Phones listed by name</strong><span>are only notified for readings that wait to be attributed.</span></div></li>
+      </ul>
+    </div>
+    <figure>
+      <div class="shot" style="max-width:460px;margin:0 auto"><img src="assets/setup-buttons.png" alt="Setup dialog explaining user buttons A and B" width="972" height="1232" loading="lazy"></div>
+    </figure>
+  </div>
+</section>
+
+<section id="devices">
+  <div class="wrap">
+    <div class="kicker">Devices</div>
+    <h2>Supported devices</h2>
+    <p class="intro">Each model has its own support ledger, with captured bytes and evidence levels. Support is only claimed after a test on the real device.</p>
+    <div class="devices">
+      <a class="device" href="https://github.com/cedhuf/ha-braun-ble/blob/main/docs/irt6575-support.md"><small>Ear thermometer</small><b>ThermoScan 7+ Connect</b><span class="status ok">Supported</span></a>
+      <a class="device" href="https://github.com/cedhuf/ha-braun-ble/blob/main/docs/bua6350-support.md"><small>Blood pressure monitor</small><b>ExactFit 5 Connect</b><span class="status exp">Experimental</span></a>
+      <div class="device"><small>Ear thermometer</small><b>ThermoScan 4 Connect</b><span class="status">Untested</span></div>
+    </div>
+    <p class="intro" style="margin:32px 0 0">Have another Braun Bluetooth device? The <a href="https://github.com/cedhuf/ha-braun-ble/blob/main/CONTRIBUTING.md">contributing guide</a> shows how a model is added without touching the core.</p>
+  </div>
+</section>
+
+<section id="install" class="alt">
+  <div class="wrap split">
+    <div>
+      <div class="kicker">Install</div>
+      <h2>Three steps.</h2>
+      <ol class="install">
+        <li><div>In HACS, add <code>cedhuf/ha-braun-ble</code> as a custom repository, category Integration, or use the button below.</div></li>
+        <li><div>Download <strong>Braun Health BLE</strong> and restart Home Assistant.</div></li>
+        <li><div>Switch your device on near a Bluetooth adapter or proxy and accept the discovery.</div></li>
+      </ol>
+      <p class="intro" style="margin:24px 0 0;font-size:16px">Requires Home Assistant 2026.6 or later.</p>
+    </div>
+    <div>
+      <div class="kicker">Principles</div>
+      <h2>Local and careful.</h2>
+      <ul class="plain">
+        <li><div><strong>No cloud</strong><span>Everything stays on the Bluetooth link between your devices and Home Assistant.</span></div></li>
+        <li><div><strong>No firmware writes</strong><span>Update services are never touched, as set out in the <a href="https://github.com/cedhuf/ha-braun-ble/blob/main/docs/scope-policy.md">scope policy</a>.</span></div></li>
+        <li><div><strong>Open protocol notes</strong><span>What is known about each device is written down, including what is not.</span></div></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="cta">
+  <div class="wrap">
+    <h2>Bring your Braun devices home.</h2>
+    <div class="actions">
+      <a class="btn primary" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cedhuf&amp;repository=ha-braun-ble&amp;category=integration">Add with HACS</a>
+      <a class="btn" href="https://github.com/cedhuf/ha-braun-ble">View on GitHub</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>Braun Health BLE is an independent open source project under the MIT license.</p>
+    <p>It is not affiliated with, endorsed by or supported by Braun, Kaz or Helen of Troy. Braun is a trademark of its owner.</p>
+  </div>
+</footer>
+</body>
+</html>
