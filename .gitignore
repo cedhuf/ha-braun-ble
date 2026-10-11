@@ -42,3 +42,4 @@ htmlcov/
 # State / keys
 *state.json
 uv.lock
+_local/
