@@ -33,6 +33,7 @@ from homeassistant.components.recorder.statistics import (
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -73,6 +74,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.entry = entry
         self.address: str = entry.unique_id or entry.data["address"]
+        self.device_id: str | None = None
 
         model_id = entry.data.get(CONF_MODEL, "IRT6575")
         self.profile: BraunModelProfile = SUPPORTED_MODELS.get(
@@ -349,6 +351,24 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         _LOGGER.debug("Firing %s event: %s", event_type, event_data)
         self.hass.bus.async_fire(event_type, event_data)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device registry info of the Braun device itself."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.address)},
+            name=self.entry.title,
+            manufacturer="Braun (Kaz / Helen of Troy)",
+            model=self.profile.name,
+        )
+
+    @callback
+    def async_register_device(self) -> None:
+        """Register the Braun device first, so people's devices can point to it."""
+        device = dr.async_get(self.hass).async_get_or_create(
+            config_entry_id=self.entry.entry_id, **self.device_info
+        )
+        self.device_id = device.id
 
     @callback
     def _device_id(self, identifier: str) -> str | None:

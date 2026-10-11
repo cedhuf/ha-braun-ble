@@ -10,7 +10,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SUBENTRY_PERSON
 from .coordinator import BraunDataUpdateCoordinator
-from .sensor import device_info
 
 
 async def async_setup_entry(
@@ -41,7 +40,7 @@ class BraunAssignButton(CoordinatorEntity[BraunDataUpdateCoordinator], ButtonEnt
         super().__init__(coordinator)
         # Kept on the thermometer device, outside the person subentry, so the
         # buttons sit next to the pending measurement.
-        self._attr_device_info = device_info(coordinator)
+        self._attr_device_info = coordinator.device_info
         if person is None:
             self._person_id = None
             self._attr_translation_key = "ignore"

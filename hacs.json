@@ -1,6 +1,6 @@
 {
   "name": "Braun Health BLE",
-  "homeassistant": "2026.6.0",
+  "homeassistant": "2026.9.0",
   "zip_release": false,
   "render_readme": true
 }

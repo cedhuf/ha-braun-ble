@@ -44,15 +44,6 @@ async def async_setup_entry(
         )
 
 
-def device_info(coordinator: BraunDataUpdateCoordinator) -> DeviceInfo:
-    return DeviceInfo(
-        identifiers={(DOMAIN, coordinator.address)},
-        name=coordinator.entry.title,
-        manufacturer="Braun (Kaz / Helen of Troy)",
-        model=coordinator.profile.name,
-    )
-
-
 class BraunSensor(CoordinatorEntity[BraunDataUpdateCoordinator], RestoreSensor):
     """Sensor reading one key of the coordinator data."""
 
@@ -65,7 +56,7 @@ class BraunSensor(CoordinatorEntity[BraunDataUpdateCoordinator], RestoreSensor):
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.address}_{description.key}"
-        self._attr_device_info = device_info(coordinator)
+        self._attr_device_info = coordinator.device_info
 
     async def async_added_to_hass(self) -> None:
         """Show the last known value until the device next connects."""
@@ -117,7 +108,7 @@ class BraunPersonSensor(CoordinatorEntity[BraunDataUpdateCoordinator], RestoreSe
             identifiers={(DOMAIN, person.subentry_id)},
             name=person.title,
             entry_type=DeviceEntryType.SERVICE,
-            via_device=(DOMAIN, coordinator.address),
+            via_device_id=coordinator.device_id,
         )
         self._attr_extra_state_attributes = {"measured_at": None}
 
@@ -160,7 +151,7 @@ class BraunPendingSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEn
         """Initialize the pending measurement sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.address}_pending"
-        self._attr_device_info = device_info(coordinator)
+        self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> str:
