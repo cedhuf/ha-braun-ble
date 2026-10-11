@@ -36,6 +36,7 @@ from .const import (
     RECORD_COUNT_UUID,
     RECORD_INDEX_REQUEST_UUID,
     RECORD_NOTIFICATION_UUID,
+    SUBENTRY_PERSON,
 )
 from .crypto import (
     compute_challenge_response,
@@ -112,6 +113,8 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "battery": None,
             "last_synced": None,
             "latest_record": {},
+            # Latest record per person subentry id
+            "persons": {},
         }
 
     async def async_setup(self) -> None:
@@ -229,6 +232,10 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.debug("Device has %d new records", pending)
         for _ in range(pending):
             record = self.profile.record_parser(await sync.read_oldest())
+            persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
+            if len(persons) == 1 and "temperature" in record:
+                record["person"] = persons[0].title
+                self.data["persons"][persons[0].subentry_id] = record
             self._async_dispatch_measurement_event(record)
             self.data["latest_record"] = record
             if "temperature" in record:

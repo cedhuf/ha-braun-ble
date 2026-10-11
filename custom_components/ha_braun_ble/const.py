@@ -7,6 +7,10 @@ CONF_AUTH_KEY = "auth_key"
 CONF_ENC_KEY = "enc_key"
 CONF_MODEL = "model"
 CONF_PIN = "pin"
+CONF_PERSON = "person"
+
+# Subentry type for the people measurements are attributed to
+SUBENTRY_PERSON = "person"
 
 # Event dispatched on new measurements
 EVENT_BRAUN_MEASUREMENT = "ha_braun_ble_measurement"

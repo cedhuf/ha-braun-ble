@@ -14,8 +14,11 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-from homeassistant.const import CONF_ADDRESS
+from homeassistant.config_entries import ConfigEntry, ConfigSubentryFlow, SubentryFlowResult
+from homeassistant.const import CONF_ADDRESS, CONF_NAME
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
 from .const import (
     CHALLENGE_RECOVERY_UUID,
@@ -24,10 +27,12 @@ from .const import (
     CONF_AUTH_KEY,
     CONF_ENC_KEY,
     CONF_MODEL,
+    CONF_PERSON,
     CONF_PIN,
     DOMAIN,
     RECORD_SERVICE_UUID,
     RECOVERY_MAGIC,
+    SUBENTRY_PERSON,
 )
 from .crypto import (
     decrypt_frame,
@@ -42,6 +47,14 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Braun BLE devices."""
 
     VERSION = 1
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        """Return the subentry types this device supports."""
+        return {SUBENTRY_PERSON: PersonSubentryFlow}
 
     def __init__(self) -> None:
         """Initialize flow state."""
@@ -286,4 +299,23 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+
+class PersonSubentryFlow(ConfigSubentryFlow):
+    """Add a person measurements can be attributed to."""
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Ask for a name and an optional Home Assistant person."""
+        if user_input is not None:
+            return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_NAME): str,
+                    vol.Optional(CONF_PERSON): EntitySelector(EntitySelectorConfig(domain="person")),
+                }
+            ),
         )

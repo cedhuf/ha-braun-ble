@@ -52,10 +52,31 @@
   "entity": {
     "sensor": {
       "temperature": {
-        "name": "Temperature"
+        "name": "Last measurement"
       },
       "battery": {
         "name": "Battery"
+      },
+      "person_temperature": {
+        "name": "Temperature {person}"
+      }
+    }
+  },
+  "config_subentries": {
+    "person": {
+      "entry_type": "Person",
+      "initiate_flow": {
+        "user": "Add person"
+      },
+      "step": {
+        "user": {
+          "title": "Add a person",
+          "description": "Measurements from this device can then be attributed to this person.",
+          "data": {
+            "name": "Name",
+            "person": "Home Assistant person (optional)"
+          }
+        }
       }
     }
   }
