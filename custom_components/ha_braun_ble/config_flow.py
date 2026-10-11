@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from typing import Any
 
 from bleak import BleakClient
@@ -36,9 +35,6 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
-    CHALLENGE_RECOVERY_UUID,
-    CHALLENGE_REQUEST_UUID,
-    CHALLENGE_RESPONSE_UUID,
     CONF_AUTH_KEY,
     CONF_DEFAULT_PERSON,
     CONF_ENC_KEY,
@@ -48,15 +44,15 @@ from .const import (
     CONF_PERSON,
     CONF_PIN,
     DOMAIN,
-    RECORD_SERVICE_UUID,
-    RECOVERY_MAGIC,
     SUBENTRY_PERSON,
 )
-from .crypto import (
-    decrypt_frame,
-    derive_recovery_key,
+from .models import (
+    DEFAULT_MODEL,
+    SUPPORTED_MODELS,
+    BraunModelProfile,
+    get_model_profile_by_name,
+    profile_for_advertisement,
 )
-from .models import SUPPORTED_MODELS, get_model_profile_by_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,10 +86,11 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize flow state."""
         self._discovered_devices: dict[str, str] = {}
+        self._discovered_profiles: dict[str, BraunModelProfile] = {}
         self._address: str | None = None
         self._device_name: str | None = None
-        self._recovery_iv: bytes | None = None
-        self._encrypted_keys: bytes | None = None
+        self._profile: BraunModelProfile = DEFAULT_MODEL
+        self._pairing_state: tuple[bytes, bytes] | None = None
         self._title = ""
         self._data: dict[str, str] = {}
 
@@ -104,9 +101,13 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
 
+        profile = profile_for_advertisement(discovery_info.name, discovery_info.service_uuids)
+        if profile is None:
+            return self.async_abort(reason="not_supported")
         self._address = discovery_info.address
         self._device_name = discovery_info.name or f"Braun {discovery_info.address}"
-        return await self.async_step_pairing_prompt()
+        self._profile = profile
+        return await self._async_after_address()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -126,8 +127,9 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if addr in configured_addresses:
                 continue
             name = service_info.name or ""
-            if RECORD_SERVICE_UUID in service_info.service_uuids or name.startswith(("TS7", "TS4")):
+            if profile := profile_for_advertisement(name, service_info.service_uuids):
                 self._discovered_devices[addr] = f"{name} ({addr})"
+                self._discovered_profiles[addr] = profile
 
         options = {
             **self._discovered_devices,
@@ -158,7 +160,16 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         self._address = address
         self._device_name = self._discovered_devices.get(address, f"Braun {address}")
-        return await self.async_step_pairing_prompt()
+        self._profile = self._discovered_profiles.get(address, DEFAULT_MODEL)
+        return await self._async_after_address()
+
+    async def _async_after_address(self) -> FlowResult:
+        """Pair when the model needs it, otherwise go straight to the people step."""
+        if self._profile.pairing is not None:
+            return await self.async_step_pairing_prompt()
+        self._title = self._profile.name
+        self._data = {CONF_ADDRESS: self._address, CONF_MODEL: self._profile.model_id}
+        return await self.async_step_people()
 
     async def async_step_manual_keys(
         self, user_input: dict[str, Any] | None = None
@@ -192,8 +203,8 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_ADDRESS, default=self._address or ""): str,
                 vol.Required(CONF_AUTH_KEY): str,
                 vol.Required(CONF_ENC_KEY): str,
-                vol.Optional(CONF_MODEL, default="IRT6575"): vol.In(
-                    {m.model_id: m.name for m in SUPPORTED_MODELS.values()}
+                vol.Optional(CONF_MODEL, default=DEFAULT_MODEL.model_id): vol.In(
+                    {m.model_id: m.name for m in SUPPORTED_MODELS.values() if m.pairing}
                 ),
             }
         )
@@ -233,11 +244,6 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not ble_device:
             return self._show_pairing_form("cannot_connect")
 
-        keys_queue: asyncio.Queue[bytes] = asyncio.Queue()
-
-        def _recovery_handler(_char, data):
-            keys_queue.put_nowait(bytes(data))
-
         try:
             client = await establish_connection(
                 BleakClient, ble_device, self._device_name or self._address, max_attempts=3
@@ -247,24 +253,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self._show_pairing_form("cannot_connect")
 
         try:
-            # Subscribe to recovery notifications
-            await client.start_notify(CHALLENGE_RECOVERY_UUID, _recovery_handler)
-
-            # Read challenge to wake crypto engine
-            await client.read_gatt_char(CHALLENGE_REQUEST_UUID)
-
-            # Generate recovery session IV and send magic recovery trigger
-            session_iv = os.urandom(12)
-            recovery_payload = RECOVERY_MAGIC + session_iv + b"\x5f"
-            await client.write_gatt_char(CHALLENGE_RESPONSE_UUID, recovery_payload, response=True)
-
-            _LOGGER.info("Recovery packet sent, waiting for device to display PIN...")
-            # Wait for encrypted keys notification
-            encrypted_payload = await asyncio.wait_for(keys_queue.get(), timeout=20.0)
-
-            self._recovery_iv = session_iv
-            self._encrypted_keys = encrypted_payload
-
+            self._pairing_state = await self._profile.pairing.request(client)
         except asyncio.TimeoutError:
             return self._show_pairing_form("pairing_timeout")
         except Exception as err:
@@ -288,39 +277,16 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             pin = user_input[CONF_PIN].strip()
             if len(pin) != 6 or not pin.isdigit():
                 errors["base"] = "invalid_pin"
+            elif keys := self._profile.pairing.keys_from_pin(pin, *self._pairing_state):
+                self._title = self._profile.name
+                self._data = {
+                    CONF_ADDRESS: self._address,
+                    CONF_MODEL: self._profile.model_id,
+                    **keys,
+                }
+                return await self.async_step_people()
             else:
-                try:
-                    decrypted: bytes | None = None
-                    # Try raw integer derivation (Kaz standard) then ascii
-                    for as_ascii in (False, True):
-                        try:
-                            rec_key = derive_recovery_key(pin, as_ascii=as_ascii)
-                            decrypted = decrypt_frame(
-                                self._encrypted_keys, rec_key, self._recovery_iv
-                            )
-                            break
-                        except Exception:
-                            continue
-
-                    if not decrypted or len(decrypted) < 32:
-                        errors["base"] = "pin_decrypt_failed"
-                    else:
-                        auth_key = decrypted[:16].hex()
-                        enc_key = decrypted[16:32].hex()
-
-                        profile = get_model_profile_by_name(self._device_name)
-                        self._title = profile.name
-                        self._data = {
-                            CONF_ADDRESS: self._address,
-                            CONF_AUTH_KEY: auth_key,
-                            CONF_ENC_KEY: enc_key,
-                            CONF_MODEL: profile.model_id,
-                        }
-                        return await self.async_step_people()
-
-                except Exception as err:
-                    _LOGGER.error("Failed to decrypt keys with entered PIN: %s", err)
-                    errors["base"] = "pin_decrypt_failed"
+                errors["base"] = "pin_decrypt_failed"
 
         return self.async_show_form(
             step_id="enter_pin",

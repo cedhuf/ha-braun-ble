@@ -58,7 +58,8 @@
       "invalid_key_length": "Keys must be 32 hexadecimal characters (16 bytes)."
     },
     "abort": {
-      "already_configured": "This Braun device is already configured."
+      "already_configured": "This Braun device is already configured.",
+      "not_supported": "This device is not a supported Braun model."
     }
   },
   "entity": {

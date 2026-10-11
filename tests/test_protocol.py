@@ -3,7 +3,7 @@ import os
 import pytest
 from cryptography.exceptions import InvalidTag
 
-from ha_braun_ble.crypto import (
+from ha_braun_ble.protocols.kaz_crypto import (
     compute_challenge_response,
     decrypt_frame,
     derive_recovery_key,

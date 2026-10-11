@@ -12,27 +12,35 @@ from typing import TYPE_CHECKING, Any
 from bleak import BleakClient
 
 from ..const import (
-    ACK_OLDEST_RECORD,
     BATTERY_LEVEL_UUID,
-    CHALLENGE_REQUEST_UUID,
-    CHALLENGE_RESPONSE_UUID,
     CONF_AUTH_KEY,
     CONF_ENC_KEY,
-    FINAL_TEMP_NOTIFICATION_UUID,
     FIRMWARE_REVISION_UUID,
     MODEL_NUMBER_UUID,
-    READ_OLDEST_RECORD,
-    RECORD_COUNT_UUID,
-    RECORD_INDEX_REQUEST_UUID,
-    RECORD_NOTIFICATION_UUID,
 )
-from ..crypto import compute_challenge_response, decrypt_frame, encrypt_frame
+from .kaz_crypto import compute_challenge_response, decrypt_frame, derive_recovery_key, encrypt_frame
 
 if TYPE_CHECKING:
     from ..coordinator import BraunDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Advertised without a local name; the name only comes in the scan response.
+RECORD_SERVICE_UUID = "aeb23580-80b6-432d-9b5a-57ff6feea94e"
+CHALLENGE_REQUEST_UUID = "8de5fe92-2b6e-4f23-acea-ea7aae6b44fe"
+CHALLENGE_RESPONSE_UUID = "fd700b4a-845e-4f41-aafa-333378f07462"
+CHALLENGE_RECOVERY_UUID = "b97838b9-2649-4c99-bbdc-0acf217300e3"
+RECORD_COUNT_UUID = "01766d60-0f08-4366-9778-d5d6c470531b"
+RECORD_INDEX_REQUEST_UUID = "220acbcf-3d5d-4720-82f3-88103d804fbb"
+RECORD_NOTIFICATION_UUID = "0fc7830b-ce64-4364-8332-00a32f6aa8e2"
+FINAL_TEMP_NOTIFICATION_UUID = "fbacb31a-6d77-4a8c-8c2d-f149ea9ff36e"
+
+# Encrypted [command, index] frames written to RECORD_INDEX_REQUEST_UUID
+READ_OLDEST_RECORD = b"\x00\x00"
+ACK_OLDEST_RECORD = b"\x01\x00"
+
+RECOVERY_MAGIC = bytes.fromhex("018d54d5")
+PIN_TIMEOUT = 20.0
 SESSION_TIMEOUT = 300
 AGE_PROFILES = {1: "0_3_months", 2: "3_36_months", 3: "over_36_months"}
 
@@ -58,6 +66,34 @@ def parse_record(payload: bytes) -> dict[str, Any]:
         "age_profile": AGE_PROFILES.get(payload[16] & 0x03),
         "unit": "°C",
     }
+
+
+async def async_request_pin(client: BleakClient) -> tuple[bytes, bytes]:
+    """Ask a device in pairing mode to show its PIN; return the IV and the encrypted keys.
+
+    Raises TimeoutError when the device does not answer.
+    """
+    keys: asyncio.Queue[bytes] = asyncio.Queue()
+    await client.start_notify(CHALLENGE_RECOVERY_UUID, lambda _char, data: keys.put_nowait(bytes(data)))
+    # Reading the challenge wakes the crypto engine up.
+    await client.read_gatt_char(CHALLENGE_REQUEST_UUID)
+    iv = os.urandom(12)
+    await client.write_gatt_char(CHALLENGE_RESPONSE_UUID, RECOVERY_MAGIC + iv + b"\x5f", response=True)
+    _LOGGER.info("Recovery packet sent, waiting for the device to display its PIN")
+    return iv, await asyncio.wait_for(keys.get(), timeout=PIN_TIMEOUT)
+
+
+def keys_from_pin(pin: str, iv: bytes, encrypted: bytes) -> dict[str, str] | None:
+    """Decrypt the pairing keys with the PIN shown on the device; None if it does not match."""
+    # Raw digit bytes are the Kaz standard; ASCII is tried for untested models.
+    for as_ascii in (False, True):
+        try:
+            keys = decrypt_frame(encrypted, derive_recovery_key(pin, as_ascii=as_ascii), iv)
+        except Exception:
+            continue
+        if len(keys) >= 32:
+            return {CONF_AUTH_KEY: keys[:16].hex(), CONF_ENC_KEY: keys[16:32].hex()}
+    return None
 
 
 class _RecordSync:

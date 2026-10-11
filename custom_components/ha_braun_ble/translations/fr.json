@@ -58,7 +58,8 @@
       "invalid_key_length": "Les clés doivent comporter 32 caractères hexadécimaux (16 octets)."
     },
     "abort": {
-      "already_configured": "Cet appareil Braun est déjà configuré."
+      "already_configured": "Cet appareil Braun est déjà configuré.",
+      "not_supported": "Cet appareil n'est pas un modèle Braun pris en charge."
     }
   },
   "entity": {

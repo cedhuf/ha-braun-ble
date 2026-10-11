@@ -1,10 +1,11 @@
-"""Cryptographic helpers for Braun BLE devices."""
+"""Kaz AES-CCM frames, PIN key recovery and session challenge, used by the ThermoScan."""
 
 from __future__ import annotations
 
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
 
-from .const import AUTH_NONCE, RECOVERY_KEY_TEMPLATE
+RECOVERY_KEY_TEMPLATE = b"I'm Sorry Dave!."
+AUTH_NONCE = b"ARE U MY MOT"
 
 
 def derive_recovery_key(digits: str, as_ascii: bool = False) -> bytes:
