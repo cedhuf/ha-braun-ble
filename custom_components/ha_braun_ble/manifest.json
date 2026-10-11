@@ -16,8 +16,14 @@
       "local_name": "TS4*"
     },
     {
-      "local_name": "BP*"
+      "local_name": "BPU*"
+    },
+    {
+      "local_name": "BP6*"
+    },
+    {
+      "local_name": "BPM*"
     }
   ],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
