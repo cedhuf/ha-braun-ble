@@ -26,6 +26,7 @@ from .const import (
     CONF_MODEL,
     CONF_PIN,
     DOMAIN,
+    RECORD_SERVICE_UUID,
     RECOVERY_MAGIC,
 )
 from .crypto import (
@@ -79,7 +80,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if addr in configured_addresses:
                 continue
             name = service_info.name or ""
-            if any(name.startswith(p) for p in ("TS7", "TS4", "BP", "IRT")) or "braun" in name.lower():
+            if RECORD_SERVICE_UUID in service_info.service_uuids or name.startswith(("TS7", "TS4")):
                 self._discovered_devices[addr] = f"{name} ({addr})"
 
         options = {

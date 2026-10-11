@@ -11,7 +11,8 @@ CONF_PIN = "pin"
 # Event dispatched on new measurements
 EVENT_BRAUN_MEASUREMENT = "ha_braun_ble_measurement"
 
-# GATT Characteristics UUIDs (Kaz / Braun TS7 & TS4)
+# GATT UUIDs (Kaz / Braun TS7 & TS4). The record service is also advertised, without a local name.
+RECORD_SERVICE_UUID = "aeb23580-80b6-432d-9b5a-57ff6feea94e"
 CHALLENGE_REQUEST_UUID = "8de5fe92-2b6e-4f23-acea-ea7aae6b44fe"
 CHALLENGE_RESPONSE_UUID = "fd700b4a-845e-4f41-aafa-333378f07462"
 CHALLENGE_RECOVERY_UUID = "b97838b9-2649-4c99-bbdc-0acf217300e3"

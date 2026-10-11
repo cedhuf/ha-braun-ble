@@ -7,6 +7,9 @@
     },
     {
       "local_name": "TS4*"
+    },
+    {
+      "service_uuid": "aeb23580-80b6-432d-9b5a-57ff6feea94e"
     }
   ],
   "codeowners": ["@cedhuf"],
