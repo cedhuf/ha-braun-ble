@@ -168,6 +168,36 @@
     .wrap { padding: 0 16px; }
     .stats { gap: 20px; }
   }
+
+  .ha-btn {
+    display: inline-flex; align-items: center; gap: 12px; padding: 9px 22px 9px 12px; border-radius: 999px;
+    background: #18bcf2; color: #fff; text-decoration: none; font-weight: 700; font-size: 16px; line-height: 1.15;
+    box-shadow: 0 8px 24px -8px rgba(24, 188, 242, .6); transition: transform .15s, box-shadow .15s;
+  }
+  .ha-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -8px rgba(24, 188, 242, .75); }
+  .ha-btn svg { width: 34px; height: 34px; padding: 7px; border-radius: 50%; background: rgba(255, 255, 255, .22); }
+  .ha-btn small { display: block; font-size: 11.5px; font-weight: 600; opacity: .85; letter-spacing: .02em; }
+
+  .phone {
+    border-radius: 28px; padding: 22px; max-width: 420px; justify-self: center; width: 100%;
+    background: linear-gradient(160deg, #1c1c1c, #3a1d10 55%, #e0561d);
+  }
+  .notif, .notif-actions { background: rgba(245, 245, 245, .82); color: #111; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+  .notif { border-radius: 20px; padding: 12px 14px; font-size: 14px; line-height: 1.35; }
+  .notif-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .notif-head .app { width: 22px; height: 22px; border-radius: 6px; background: #18bcf2; color: #fff; display: grid; place-items: center; }
+  .notif-head .app svg { width: 14px; height: 14px; }
+  .notif-head b { flex: 1; font-size: 14px; }
+  .notif-head time { color: #666; font-size: 13px; }
+  .notif p { margin: 0; }
+  .notif-actions { margin: 10px 28px 0; border-radius: 16px; overflow: hidden; display: grid; }
+  .notif-actions span { padding: 11px 16px; font-size: 15px; border-top: 1px solid rgba(0, 0, 0, .08); }
+  .notif-actions span:first-child { border-top: 0; }
+  @media (prefers-color-scheme: dark) {
+    .notif, .notif-actions { background: rgba(40, 40, 40, .82); color: #f2f2f2; }
+    .notif-head time { color: #aaa; }
+    .notif-actions span { border-top-color: rgba(255, 255, 255, .1); }
+  }
 </style>
 </head>
 <body>
@@ -191,7 +221,10 @@
       <h1>Every Braun reading, <em>filed for the right person.</em></h1>
       <p class="lead">Thermometers and blood pressure monitors sync over Bluetooth the second you measure. No cloud, no account, no app in the middle.</p>
       <div class="actions">
-        <a class="btn primary" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cedhuf&amp;repository=ha-braun-ble&amp;category=integration">Add with HACS</a>
+        <a class="ha-btn" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cedhuf&amp;repository=ha-braun-ble&amp;category=integration">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6 1.8 12.1c-.4.4-.1 1 .4 1H4v7.4c0 .5.4.9.9.9h4.6v-5.6h5v5.6h4.6c.5 0 .9-.4.9-.9v-7.4h1.8c.5 0 .8-.6.4-1z"/></svg>
+          <span><small>Open in Home Assistant</small>Add to HACS</span>
+        </a>
         <a class="btn" href="https://github.com/cedhuf/ha-braun-ble">View on GitHub</a>
       </div>
       <div class="stats">
@@ -201,8 +234,8 @@
       </div>
     </div>
     <div class="showcase">
-      <div class="shot"><img src="assets/thermometer.png" alt="ThermoScan 7+ device page in Home Assistant with last measurement, age profile, battery and pending measurement" width="1404" height="840"></div>
-      <div class="shot float"><img src="assets/pending.png" alt="Home Assistant notification listing Braun measurements to attribute" width="940" height="420"></div>
+      <div class="shot"><picture><source srcset="assets/thermometer-dark.png" media="(prefers-color-scheme: dark)"><img src="assets/thermometer.png" alt="ThermoScan 7+ device page in Home Assistant with last measurement, age profile, battery and pending measurement" width="1404" height="840"></picture></div>
+      <div class="shot float"><picture><source srcset="assets/pending-dark.png" media="(prefers-color-scheme: dark)"><img src="assets/pending.png" alt="Home Assistant notification listing Braun measurements to attribute" width="940" height="420"></picture></div>
     </div>
   </div>
 </div>
@@ -244,10 +277,19 @@
         <li><div><strong>Automatically</strong><span>Buttons A and B of a monitor go straight to their person; a shared button asks every time.</span></div></li>
       </ul>
     </div>
+    <div class="stack">
+    <div class="phone" role="img" aria-label="iPhone notification asking who a blood pressure reading was for, with buttons Cedric, Maman and Ignore">
+      <div class="notif">
+        <div class="notif-head"><span class="app"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6 1.8 12.1c-.4.4-.1 1 .4 1H4v7.4c0 .5.4.9.9.9h4.6v-5.6h5v5.6h4.6c.5 0 .9-.4.9-.9v-7.4h1.8c.5 0 .8-.6.4-1z"/></svg></span><b>Braun ExactFit 5 Connect</b><time>now</time></div>
+        <p>130/84 mmHg, pulse 87 measured Oct 11 16:23 (user B, body movement). Who was it for?</p>
+      </div>
+      <div class="notif-actions"><span>Cedric</span><span>Maman</span><span>Ignore</span></div>
+    </div>
     <figure>
-      <div class="shot"><img src="assets/person.png" alt="A person's device page with their temperature and an activity log of attributed readings" width="1568" height="779" loading="lazy"></div>
+      <div class="shot"><picture><source srcset="assets/person-dark.png" media="(prefers-color-scheme: dark)"><img src="assets/person.png" alt="A person's device page with their temperature and an activity log of attributed readings" width="1568" height="779" loading="lazy"></picture></div>
       <figcaption>Each person is a device of their own, with every attribution in its activity log.</figcaption>
     </figure>
+    </div>
   </div>
 </section>
 
@@ -311,7 +353,10 @@
   <div class="wrap">
     <h2>Bring your Braun devices home.</h2>
     <div class="actions">
-      <a class="btn primary" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cedhuf&amp;repository=ha-braun-ble&amp;category=integration">Add with HACS</a>
+      <a class="ha-btn" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cedhuf&amp;repository=ha-braun-ble&amp;category=integration">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6 1.8 12.1c-.4.4-.1 1 .4 1H4v7.4c0 .5.4.9.9.9h4.6v-5.6h5v5.6h4.6c.5 0 .9-.4.9-.9v-7.4h1.8c.5 0 .8-.6.4-1z"/></svg>
+          <span><small>Open in Home Assistant</small>Add to HACS</span>
+        </a>
       <a class="btn" href="https://github.com/cedhuf/ha-braun-ble">View on GitHub</a>
     </div>
   </div>
