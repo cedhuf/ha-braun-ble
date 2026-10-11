@@ -65,60 +65,53 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle manual setup or device selection."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
-            if user_input.get("setup_mode") == "manual_keys":
+            choice = user_input[CONF_ADDRESS]
+            if choice == "manual_keys":
                 return await self.async_step_manual_keys()
+            if choice == "manual":
+                return await self.async_step_manual_address()
+            return await self._async_select_address(choice)
 
-            address = user_input[CONF_ADDRESS]
-            await self.async_set_unique_id(address)
-            self._abort_if_unique_id_configured()
-
-            self._address = address
-            self._device_name = self._discovered_devices.get(address, f"Braun {address}")
-            return await self.async_step_pairing_prompt()
-
-        # Discover nearby BLE devices
-        current_entries = self._async_current_entries()
-        configured_addresses = {entry.unique_id for entry in current_entries}
-
+        configured_addresses = {entry.unique_id for entry in self._async_current_entries()}
         for service_info in bluetooth.async_discovered_service_info(self.hass):
             addr = service_info.address
             if addr in configured_addresses:
                 continue
             name = service_info.name or ""
-            # Filter Braun prefixes (TS7, TS4, BP, Kaz)
             if any(name.startswith(p) for p in ("TS7", "TS4", "BP", "IRT")) or "braun" in name.lower():
                 self._discovered_devices[addr] = f"{name} ({addr})"
 
-        options = dict(self._discovered_devices)
-        options["manual"] = "Manual MAC address entry"
-        options["manual_keys"] = "Manual keys entry (advanced users)"
-
-        schema = vol.Schema(
-            {
-                vol.Required("setup_mode", default="discover" if self._discovered_devices else "manual"): vol.In(
-                    {
-                        "discover": "Select a discovered device",
-                        "manual": "Enter MAC address",
-                        "manual_keys": "Enter pre-extracted keys",
-                    }
-                ),
-            }
-        )
-        if self._discovered_devices:
-            schema = vol.Schema(
-                {
-                    vol.Required(CONF_ADDRESS): vol.In(options),
-                }
-            )
-
+        options = {
+            **self._discovered_devices,
+            "manual": "Enter MAC address",
+            "manual_keys": "Enter pre-extracted keys (advanced users)",
+        }
         return self.async_show_form(
             step_id="user",
-            data_schema=schema,
-            errors=errors,
+            data_schema=vol.Schema({vol.Required(CONF_ADDRESS): vol.In(options)}),
         )
+
+    async def async_step_manual_address(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask for the MAC address of a device that was not discovered."""
+        if user_input is not None:
+            return await self._async_select_address(user_input[CONF_ADDRESS].strip().upper())
+
+        return self.async_show_form(
+            step_id="manual_address",
+            data_schema=vol.Schema({vol.Required(CONF_ADDRESS): str}),
+        )
+
+    async def _async_select_address(self, address: str) -> FlowResult:
+        """Bind the flow to an address and move on to pairing."""
+        await self.async_set_unique_id(address)
+        self._abort_if_unique_id_configured()
+
+        self._address = address
+        self._device_name = self._discovered_devices.get(address, f"Braun {address}")
+        return await self.async_step_pairing_prompt()
 
     async def async_step_manual_keys(
         self, user_input: dict[str, Any] | None = None

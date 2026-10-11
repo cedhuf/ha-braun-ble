@@ -5,8 +5,14 @@
         "title": "Connecter un appareil Braun BLE",
         "description": "Sélectionnez un appareil Braun détecté ou configurez la connexion manuellement.",
         "data": {
-          "address": "Appareil Bluetooth",
-          "setup_mode": "Mode d'installation"
+          "address": "Appareil Bluetooth"
+        }
+      },
+      "manual_address": {
+        "title": "Saisir l'adresse MAC",
+        "description": "Saisissez l'adresse MAC Bluetooth de l'appareil (par exemple AA:BB:CC:DD:EE:FF).",
+        "data": {
+          "address": "Adresse MAC Bluetooth"
         }
       },
       "pairing_prompt": {

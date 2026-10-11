@@ -5,8 +5,14 @@
         "title": "Connect Braun BLE Device",
         "description": "Select a discovered Braun health device or enter connection details.",
         "data": {
-          "address": "Bluetooth Device",
-          "setup_mode": "Setup Mode"
+          "address": "Bluetooth Device"
+        }
+      },
+      "manual_address": {
+        "title": "Enter MAC Address",
+        "description": "Enter the Bluetooth MAC address of the device (e.g. AA:BB:CC:DD:EE:FF).",
+        "data": {
+          "address": "Bluetooth MAC Address"
         }
       },
       "pairing_prompt": {
