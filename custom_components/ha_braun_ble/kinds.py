@@ -152,6 +152,7 @@ def _pressure_sensor(key: str, record_attributes: bool = False, **kwargs: Any) -
         translation_key=key,
         device_class=SensorDeviceClass.PRESSURE,
         native_unit_of_measurement=UnitOfPressure.MMHG,
+        suggested_display_precision=0,
         icon="mdi:heart-pulse",
         record_attributes=record_attributes,
         **kwargs,
@@ -160,7 +161,12 @@ def _pressure_sensor(key: str, record_attributes: bool = False, **kwargs: Any) -
 
 def _pulse_sensor(**kwargs: Any) -> BraunSensorDescription:
     return BraunSensorDescription(
-        key="pulse", translation_key="pulse", native_unit_of_measurement=BPM, icon="mdi:heart", **kwargs
+        key="pulse",
+        translation_key="pulse",
+        native_unit_of_measurement=BPM,
+        suggested_display_precision=0,
+        icon="mdi:heart",
+        **kwargs,
     )
 
 
