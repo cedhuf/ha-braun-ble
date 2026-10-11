@@ -23,11 +23,14 @@ from homeassistant.config_entries import (
     SubentryFlowResult,
 )
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
     TextSelector,
     TextSelectorConfig,
 )
@@ -37,9 +40,10 @@ from .const import (
     CHALLENGE_REQUEST_UUID,
     CHALLENGE_RESPONSE_UUID,
     CONF_AUTH_KEY,
-    CONF_AUTO_ASSIGN,
+    CONF_DEFAULT_PERSON,
     CONF_ENC_KEY,
     CONF_MODEL,
+    CONF_NOTIFY,
     CONF_PEOPLE,
     CONF_PERSON,
     CONF_PIN,
@@ -55,6 +59,13 @@ from .crypto import (
 from .models import SUPPORTED_MODELS, get_model_profile_by_name
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _notify_selector(hass: HomeAssistant) -> SelectSelector:
+    """Offer the phones running the Home Assistant app, which support action buttons."""
+    services = hass.services.async_services_for_domain("notify")
+    phones = sorted(name for name in services if name.startswith("mobile_app_"))
+    return SelectSelector(SelectSelectorConfig(options=phones, multiple=True))
 
 
 class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -329,7 +340,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=self._title,
                 data=self._data,
-                options={CONF_AUTO_ASSIGN: user_input[CONF_AUTO_ASSIGN]},
+                options={CONF_NOTIFY: user_input.get(CONF_NOTIFY, [])},
                 subentries=[
                     ConfigSubentryData(
                         data={CONF_NAME: name},
@@ -346,10 +357,11 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_PEOPLE): TextSelector(TextSelectorConfig(multiple=True)),
-                    vol.Required(CONF_AUTO_ASSIGN, default=False): bool,
+                    vol.Optional(CONF_NOTIFY): _notify_selector(self.hass),
                 }
             ),
         )
+
 
 class PersonSubentryFlow(ConfigSubentryFlow):
     """Add a person measurements can be attributed to."""
@@ -374,7 +386,7 @@ class BraunOptionsFlow(OptionsFlow):
     """Device options."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Let the user opt in to automatic attribution."""
+        """Choose the phones to notify and an optional person to attribute everything to."""
         if user_input is not None:
             return self.async_create_entry(data=user_input)
 
@@ -382,10 +394,20 @@ class BraunOptionsFlow(OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_AUTO_ASSIGN,
-                        default=self.config_entry.options.get(CONF_AUTO_ASSIGN, False),
-                    ): bool,
+                    vol.Optional(
+                        CONF_NOTIFY, default=self.config_entry.options.get(CONF_NOTIFY, [])
+                    ): _notify_selector(self.hass),
+                    vol.Optional(
+                        CONF_DEFAULT_PERSON,
+                        description={"suggested_value": self.config_entry.options.get(CONF_DEFAULT_PERSON)},
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                SelectOptionDict(value=person.subentry_id, label=person.title)
+                                for person in self.config_entry.get_subentries_of_type(SUBENTRY_PERSON)
+                            ]
+                        )
+                    ),
                 }
             ),
         )

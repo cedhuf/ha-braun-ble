@@ -30,7 +30,8 @@ from homeassistant.components.recorder.statistics import (
 )
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import UnitOfTemperature
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.components import persistent_notification
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -42,9 +43,10 @@ from .const import (
     CHALLENGE_REQUEST_UUID,
     CHALLENGE_RESPONSE_UUID,
     CONF_AUTH_KEY,
-    CONF_AUTO_ASSIGN,
+    CONF_DEFAULT_PERSON,
     CONF_ENC_KEY,
     CONF_MODEL,
+    CONF_NOTIFY,
     DOMAIN,
     EVENT_BRAUN_ATTRIBUTION,
     EVENT_BRAUN_IGNORED,
@@ -63,12 +65,18 @@ from .crypto import (
     decrypt_frame,
     encrypt_frame,
 )
+from .messages import text
 from .models import BraunModelProfile, SUPPORTED_MODELS, get_model_profile_by_name
 
 _LOGGER = logging.getLogger(__name__)
 
 
 SESSION_TIMEOUT = 300
+
+
+def _record_id(record: dict[str, Any]) -> str:
+    """Identify a measurement by its time and the device sequence number."""
+    return f"{int(datetime.fromisoformat(record['timestamp']).timestamp())}_{record['sequence']}"
 
 
 class _RecordSync:
@@ -125,6 +133,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         self._unsubscribe_ble: CALLBACK_TYPE | None = None
+        self._unsubscribe_actions: CALLBACK_TYPE = lambda: None
         self._sync_lock = asyncio.Lock()
         self._store: Store[list[dict[str, Any]]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         # Measurements waiting to be attributed, oldest first
@@ -143,6 +152,12 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_setup(self) -> None:
         """Load pending measurements and listen for the device waking up."""
         self.pending = await self._store.async_load() or []
+        for record in self.pending:
+            record.setdefault("id", _record_id(record))
+        self._async_update_pending_notification()
+        self._unsubscribe_actions = self.hass.bus.async_listen(
+            "mobile_app_notification_action", self._async_handle_notification_action
+        )
         _LOGGER.debug("Setting up Bluetooth listener for %s (%s)", self.profile.name, self.address)
         self._unsubscribe_ble = bluetooth.async_register_callback(
             self.hass,
@@ -260,11 +275,15 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             record = self.profile.record_parser(await sync.read_oldest())
             if "temperature" in record:
                 persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
-                if self.entry.options.get(CONF_AUTO_ASSIGN) and len(persons) == 1:
-                    await self._async_attribute(record, persons[0])
-                else:
+                default = self.entry.subentries.get(self.entry.options.get(CONF_DEFAULT_PERSON) or "")
+                if default:
+                    await self._async_attribute(record, default)
+                elif persons:
+                    record["id"] = _record_id(record)
                     self.pending.append(record)
                     await self._store.async_save(self.pending)
+                    self._async_update_pending_notification()
+                    await self._async_notify_phones(record, persons)
             self._async_dispatch_measurement_event(record)
             self.data["latest_record"] = record
             if "temperature" in record:
@@ -275,17 +294,77 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.data["last_synced"] = datetime.now().isoformat()
         self.async_set_updated_data(self.data)
 
-    async def async_assign_oldest(self, subentry_id: str | None) -> None:
-        """Attribute the oldest pending measurement to a person, or drop it when None."""
-        if not self.pending:
+    async def async_assign(self, record_id: str | None, subentry_id: str | None) -> None:
+        """Attribute a pending measurement (the oldest when record_id is None) or drop it.
+
+        A subentry_id of None drops the measurement.
+        """
+        record = next((r for r in self.pending if record_id in (None, r["id"])), None)
+        person = self.entry.subentries.get(subentry_id) if subentry_id else None
+        if record is None or (subentry_id and person is None):
             return
-        record = self.pending.pop(0)
+        self.pending.remove(record)
         await self._store.async_save(self.pending)
-        if subentry_id is not None:
-            await self._async_attribute(record, self.entry.subentries[subentry_id])
+        if person is not None:
+            await self._async_attribute(record, person)
         else:
             self._async_fire(EVENT_BRAUN_IGNORED, self.address, record)
+        self._async_update_pending_notification()
+        await self._async_clear_phone_notification(record)
         self.async_update_listeners()
+
+    async def _async_notify_phones(self, record: dict[str, Any], persons: list[ConfigSubentry]) -> None:
+        """Ask on each chosen phone who the measurement was for."""
+        targets = [*persons, None]
+        actions = [
+            {
+                "action": f"{DOMAIN}|{self.entry.entry_id}|{record['id']}|{p.subentry_id if p else ''}",
+                "title": p.title if p else text(self.hass, "ignore"),
+            }
+            for p in targets
+        ]
+        await self._async_send_to_phones(
+            {
+                "title": self.entry.title,
+                "message": text(self.hass, "notify_message", record),
+                "data": {"tag": record["id"], "actions": actions},
+            }
+        )
+
+    async def _async_clear_phone_notification(self, record: dict[str, Any]) -> None:
+        await self._async_send_to_phones({"message": "clear_notification", "data": {"tag": record["id"]}})
+
+    async def _async_send_to_phones(self, payload: dict[str, Any]) -> None:
+        """Notify each chosen phone; a phone removed since must not break the sync."""
+        for service in self.entry.options.get(CONF_NOTIFY, []):
+            try:
+                await self.hass.services.async_call("notify", service, payload)
+            except Exception as err:
+                _LOGGER.warning("Could not notify %s: %s", service, err)
+
+    async def _async_handle_notification_action(self, event: Event) -> None:
+        """Apply a person or ignore button tapped on a phone."""
+        parts = event.data.get("action", "").split("|")
+        if len(parts) == 4 and parts[0] == DOMAIN and parts[1] == self.entry.entry_id:
+            await self.async_assign(parts[2], parts[3] or None)
+
+    @callback
+    def _async_update_pending_notification(self) -> None:
+        """Keep one Home Assistant notification listing what waits to be attributed."""
+        notification_id = f"{DOMAIN}_{self.entry.entry_id}_pending"
+        if not self.pending:
+            persistent_notification.async_dismiss(self.hass, notification_id)
+            return
+        device = dr.async_get(self.hass).async_get_device(identifiers={(DOMAIN, self.address)})
+        lines = [text(self.hass, "pending_line", record) for record in self.pending]
+        if device:
+            lines += ["", text(self.hass, "pending_link", device=self.entry.title, device_id=device.id)]
+        persistent_notification.async_create(
+            self.hass,
+            "\n".join(lines),
+            title=text(self.hass, "pending_title"),
+            notification_id=notification_id,
+        )
 
     async def _async_attribute(self, record: dict[str, Any], person: ConfigSubentry) -> None:
         """Give a measurement to a person and add it to their hourly statistics."""
@@ -350,3 +429,4 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._unsubscribe_ble:
             self._unsubscribe_ble()
             self._unsubscribe_ble = None
+        self._unsubscribe_actions()

@@ -38,14 +38,14 @@
       },
       "people": {
         "title": "Qui utilise ce thermomètre ?",
-        "description": "Le thermomètre ne sait pas qui est mesuré. Chaque mesure attend donc d'être attribuée : le capteur « Mesure à attribuer » de l'appareil affiche la plus ancienne, et un bouton par personne la range (ou « Ignorer la mesure en attente » pour une mesure ratée). Déclarez ici les personnes à suivre ; vous pourrez en ajouter ou en retirer plus tard depuis la page de l'appareil.",
+        "description": "Le thermomètre ne sait pas qui est mesuré. Chaque mesure attend donc d'être attribuée : le capteur « Mesure à attribuer » de l'appareil affiche la plus ancienne, et un bouton par personne la range, tout comme la notification envoyée aux téléphones choisis ci-dessous (ou « Ignorer la mesure en attente » pour une mesure ratée). Déclarez ici les personnes à suivre ; vous pourrez en ajouter ou en retirer plus tard depuis la page de l'appareil.",
         "data": {
           "people": "Personnes",
-          "auto_assign": "Attribuer automatiquement les mesures quand une seule personne est déclarée"
+          "notify": "Téléphones à qui demander pour qui est chaque mesure"
         },
         "data_description": {
           "people": "Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
-          "auto_assign": "Désactivé par défaut : sinon, la mesure d'un invité ou d'un enfant de passage finirait dans l'historique de cette personne."
+          "notify": "Téléphones avec l'app Home Assistant. Chaque nouvelle mesure envoie une notification avec un bouton par personne."
         }
       }
     },
@@ -117,10 +117,12 @@
       "init": {
         "title": "Options",
         "data": {
-          "auto_assign": "Attribuer automatiquement les mesures quand une seule personne est déclarée"
+          "notify": "Téléphones à qui demander pour qui est chaque mesure",
+          "default_person": "Attribuer automatiquement toutes les mesures à"
         },
         "data_description": {
-          "auto_assign": "Désactivé par défaut : sinon, la mesure d'un invité ou d'un enfant de passage finirait dans l'historique de cette personne."
+          "notify": "Téléphones avec l'app Home Assistant. Chaque nouvelle mesure envoie une notification avec un bouton par personne.",
+          "default_person": "Laissez vide pour que chaque mesure attende d'être attribuée. Sinon, la mesure d'un invité ou d'un enfant de passage finirait dans l'historique de cette personne."
         }
       }
     }

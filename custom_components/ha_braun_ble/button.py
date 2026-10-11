@@ -59,4 +59,4 @@ class BraunAssignButton(CoordinatorEntity[BraunDataUpdateCoordinator], ButtonEnt
 
     async def async_press(self) -> None:
         """Attribute or drop the oldest pending measurement."""
-        await self.coordinator.async_assign_oldest(self._person_id)
+        await self.coordinator.async_assign(None, self._person_id)

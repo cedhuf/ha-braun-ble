@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SUBENTRY_PERSON
 from .coordinator import BraunDataUpdateCoordinator
+from .messages import text
 
 TEMPERATURE = SensorEntityDescription(
     key="temperature",
@@ -185,12 +186,10 @@ class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator]
 
 
 class BraunPendingSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEntity):
-    """Oldest measurement still waiting to be attributed."""
+    """Oldest measurement still waiting to be attributed, as text with its time."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "pending"
-    _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
     def __init__(self, coordinator: BraunDataUpdateCoordinator) -> None:
         """Initialize the pending measurement sensor."""
@@ -199,15 +198,18 @@ class BraunPendingSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEn
         self._attr_device_info = device_info(coordinator)
 
     @property
-    def native_value(self) -> float | None:
-        """Return the oldest pending temperature."""
-        return self.coordinator.pending[0]["temperature"] if self.coordinator.pending else None
+    def native_value(self) -> str | None:
+        """Return the oldest pending temperature and when it was taken."""
+        if not self.coordinator.pending:
+            return None
+        return text(self.hass, "pending_value", self.coordinator.pending[0])
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return when it was measured and how many are waiting."""
+        """Return the raw values and how many measurements are waiting."""
         oldest = self.coordinator.pending[0] if self.coordinator.pending else {}
         return {
+            "temperature": oldest.get("temperature"),
             "measured_at": oldest.get("timestamp"),
             "ambient_temperature": oldest.get("ambient_temperature"),
             "waiting": len(self.coordinator.pending),

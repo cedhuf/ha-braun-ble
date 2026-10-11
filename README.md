@@ -78,23 +78,30 @@ The thermometer does not know who is being measured, so every reading waits to b
 
 1. **Declare people** at the end of the pairing wizard, or later with **Add person** on the thermometer's device page. A person only needs a first name; linking a Home Assistant person is optional, so children need no account.
 2. **Take readings** as usual. Each one lands in the **Pending measurement** sensor (the oldest waiting reading, with its time and the number still waiting).
-3. **Attribute them**, right away or the next day: press **Assign to <name>** on the thermometer's device page, or **Ignore pending measurement** for a failed reading. The next waiting reading then shows up.
+3. **Attribute them**, right away or the next day:
+   - **On your phone**: pick the phones in the device options (or at the end of pairing). Each new reading sends a notification such as *"36.7 °C measured 11/10 13:35. Who was it for?"* with one button per person and **Ignore**. The notification disappears from every phone once the reading is attributed.
+   - **In Home Assistant**: a notification (the bell) lists every reading still waiting, with a link to the thermometer.
+   - **On the device page**: press **Assign to <name>**, or **Ignore pending measurement** for a failed reading. This always applies to the oldest waiting reading, shown by the **Pending measurement** sensor; the next one then shows up.
+
+Phone buttons need the Home Assistant Companion app. Android shows at most three buttons per notification, so with more than two people use the device page.
 
 Each person appears as their own device with a **Temperature** sensor (latest reading, kept across restarts) and a long-term statistic `ha_braun_ble:<id>_temperature` dated at the real measurement time, for the *Statistics graph* card. The sensor's own history is dated when the reading was attributed.
 
-Automatic attribution can be turned on in the device options, and only applies when a single person is declared. It is off by default so that a guest's reading never lands in someone's history.
+To skip attribution, pick a person under **Attribute every measurement automatically to** in the device options: every reading then goes straight to them. It is empty by default so that a guest's reading never lands in someone's history.
 
 ### Device sensors
 
 | Sensor | Content |
 |---|---|
 | Last measurement | Latest reading, whoever it was for |
-| Pending measurement | Oldest reading waiting to be attributed |
+| Pending measurement | Oldest reading waiting, as text such as `36.7 °C · 11/10 13:35` |
 | Battery | Battery level |
 | Ambient temperature | Ambient temperature at the last reading (disabled by default) |
 | Model, Firmware | Diagnostic |
 
-Every reading also fires a `ha_braun_ble_measurement` event for custom automations.
+**Pending measurement is text, not a number**, so it has no graph or statistics: it is a waiting list. Temperature curves live on **Last measurement** (every reading, whoever it was for) and on each person's **Temperature**. Without any person declared, readings are never queued and only **Last measurement** is updated, which is all you need for live use.
+
+Events for custom automations: `ha_braun_ble_measurement` (every reading), `ha_braun_ble_attribution` and `ha_braun_ble_ignored`. They also appear in the device activity log.
 
 ### Apple Health (HealthKit)
 See our step-by-step guide in [docs/apple-health-setup.md](docs/apple-health-setup.md) to log temperature measurements directly into the iOS Health app via Apple Shortcuts.

@@ -8,8 +8,9 @@ CONF_ENC_KEY = "enc_key"
 CONF_MODEL = "model"
 CONF_PIN = "pin"
 CONF_PERSON = "person"
-CONF_AUTO_ASSIGN = "auto_assign"
+CONF_DEFAULT_PERSON = "default_person"
 CONF_PEOPLE = "people"
+CONF_NOTIFY = "notify"
 
 # Subentry type for the people measurements are attributed to
 SUBENTRY_PERSON = "person"

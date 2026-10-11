@@ -38,14 +38,14 @@
       },
       "people": {
         "title": "Who uses this thermometer?",
-        "description": "The thermometer does not know who is being measured. Every measurement therefore waits to be attributed: the \"Pending measurement\" sensor on the device shows the oldest one, and one button per person files it (or \"Ignore pending measurement\" for a failed reading). Add the people to follow here; you can add or remove people later from the device page.",
+        "description": "The thermometer does not know who is being measured. Every measurement therefore waits to be attributed: the \"Pending measurement\" sensor on the device shows the oldest one, and one button per person files it, as does the notification sent to the phones chosen below (or \"Ignore pending measurement\" for a failed reading). Add the people to follow here; you can add or remove people later from the device page.",
         "data": {
           "people": "People",
-          "auto_assign": "Attribute measurements automatically when only one person is set up"
+          "notify": "Phones asked who each measurement was for"
         },
         "data_description": {
           "people": "One first name per entry. Leave empty to add people later.",
-          "auto_assign": "Off by default: a guest or a visiting child would otherwise end up in that person's history."
+          "notify": "Phones running the Home Assistant app. Each new measurement sends a notification with one button per person."
         }
       }
     },
@@ -117,10 +117,12 @@
       "init": {
         "title": "Options",
         "data": {
-          "auto_assign": "Attribute measurements automatically when only one person is set up"
+          "notify": "Phones asked who each measurement was for",
+          "default_person": "Attribute every measurement automatically to"
         },
         "data_description": {
-          "auto_assign": "Off by default: a guest or a visiting child would otherwise end up in that person's history."
+          "notify": "Phones running the Home Assistant app. Each new measurement sends a notification with one button per person.",
+          "default_person": "Leave empty so each measurement waits to be attributed. A guest's or a visiting child's reading would otherwise land in this person's history."
         }
       }
     }
