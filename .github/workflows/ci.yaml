@@ -34,8 +34,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Check manifest version matches tag
         run: test "v$(jq -r .version custom_components/ha_braun_ble/manifest.json)" = "$GITHUB_REF_NAME"
-      - run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+      - run: |
+          previous=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^")
+          git log --format='- %s' "$previous..$GITHUB_REF_NAME" > notes.md
+          gh release create "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
         env:
           GH_TOKEN: ${{ github.token }}
