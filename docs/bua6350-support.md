@@ -101,6 +101,12 @@ switches off.
 the monitor's time. **Unconfirmed**: the write format and whether the monitor
 accepts it; never written.
 
+## Failed measurements
+
+**Device.** A measurement that ends on an error code on the screen sends nothing: no
+notification was received for it while connected. Only finished measurements reach
+Home Assistant, with their status bits.
+
 ## Not yet known
 
 - **Stored history.** The monitor keeps 200 measurements per user, but nothing is sent
