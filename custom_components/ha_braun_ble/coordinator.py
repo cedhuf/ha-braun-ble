@@ -60,7 +60,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.address: str = entry.unique_id or entry.data["address"]
         self.auth_key: bytes = bytes.fromhex(entry.data[CONF_AUTH_KEY])
         self.enc_key: bytes = bytes.fromhex(entry.data[CONF_ENC_KEY])
-        
+
         model_id = entry.data.get(CONF_MODEL, "IRT6575")
         self.profile: BraunModelProfile = SUPPORTED_MODELS.get(
             model_id, get_model_profile_by_name(entry.title)
@@ -217,7 +217,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 try:
                     _uuid, frame = await asyncio.wait_for(records_queue.get(), timeout=3.5)
                     plain = decrypt_frame(frame, self.enc_key, session_iv)
-                    
+
                     parsed = {}
                     if self.profile.record_parser:
                         parsed = self.profile.record_parser(plain)

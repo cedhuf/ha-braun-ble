@@ -9,7 +9,7 @@ from .const import AUTH_NONCE, RECOVERY_KEY_TEMPLATE
 
 def derive_recovery_key(digits: str, as_ascii: bool = False) -> bytes:
     """Derive recovery AES key from the 6 digits shown on device.
-    
+
     The digits are substituted at indices (5, 6, 9, 10, 14, 15) into
     the template b"I'm Sorry Dave!.".
     By default, digits are encoded as raw integers (e.g. 7 -> 0x07),
@@ -27,7 +27,7 @@ def derive_recovery_key(digits: str, as_ascii: bool = False) -> bytes:
 
 def decrypt_frame(frame: bytes, key: bytes, iv: bytes) -> bytes:
     """Decrypt an AES-CCM frame.
-    
+
     Frame format: counter (1 byte) || ciphertext || 16-byte MAC tag.
     Nonce: 12-byte IV || counter (1 byte).
     AAD: counter (1 byte).
@@ -41,7 +41,7 @@ def decrypt_frame(frame: bytes, key: bytes, iv: bytes) -> bytes:
 
 def encrypt_frame(plain: bytes, key: bytes, iv: bytes, counter: int) -> bytes:
     """Encrypt payload into an AES-CCM frame.
-    
+
     Frame format: counter (1 byte) || ciphertext || 16-byte MAC tag.
     Nonce: 12-byte IV || counter (1 byte).
     AAD: counter (1 byte).
@@ -54,7 +54,7 @@ def encrypt_frame(plain: bytes, key: bytes, iv: bytes, counter: int) -> bytes:
 
 def compute_challenge_response(challenge: bytes, auth_key: bytes, session_iv: bytes) -> bytes:
     """Compute 21-byte challenge response to authenticate with the device.
-    
+
     1. Encrypt challenge[:16] with auth_key and nonce AUTH_NONCE + 0x00.
     2. Extract 4 bytes from digest starting at challenge[16] % 16.
     3. Return 4-byte slice + 12-byte session_iv + b'\\x01' (total 21 bytes).

@@ -41,7 +41,7 @@ def _decode_sfloat(raw: int) -> float:
 
 def parse_thermoscan_record(payload: bytes) -> dict[str, Any]:
     """Parse decrypted record from ThermoScan 7+ / ThermoScan 4.
-    
+
     Expected record length varies between 6 and 14 bytes depending on firmware.
     Handles both fixed-point integer (tenths/hundredths °C) and IEEE-11073 SFLOAT formats.
     """
@@ -104,7 +104,7 @@ def parse_thermoscan_record(payload: bytes) -> dict[str, Any]:
 
 def parse_blood_pressure_record(payload: bytes) -> dict[str, Any]:
     """Stub parser for Braun ExactFit Blood Pressure Monitors.
-    
+
     Extracts systolic, diastolic, pulse and irregular heartbeat flags.
     Standard Bluetooth Health SIG Blood Pressure Measurement format (0x2A35)
     or Kaz proprietary frame.

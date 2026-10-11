@@ -203,7 +203,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             # Subscribe to recovery notifications
             await client.start_notify(CHALLENGE_RECOVERY_UUID, _recovery_handler)
-            
+
             # Read challenge to wake crypto engine
             await client.read_gatt_char(CHALLENGE_REQUEST_UUID)
 
@@ -215,10 +215,10 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.info("Recovery packet sent, waiting for device to display PIN...")
             # Wait for encrypted keys notification
             encrypted_payload = await asyncio.wait_for(keys_queue.get(), timeout=20.0)
-            
+
             self._recovery_iv = session_iv
             self._encrypted_keys = encrypted_payload
-            
+
         except asyncio.TimeoutError:
             return self._show_pairing_form("pairing_timeout")
         except Exception as err:
