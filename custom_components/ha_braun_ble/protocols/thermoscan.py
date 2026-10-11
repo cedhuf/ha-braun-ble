@@ -174,4 +174,4 @@ async def _async_sync_pending(coordinator: BraunDataUpdateCoordinator, sync: _Re
     for _ in range(pending):
         await coordinator.async_add_record(parse_record(await sync.read_oldest()))
         await sync.ack_oldest()
-    coordinator.async_synced()
+    await coordinator.async_synced()

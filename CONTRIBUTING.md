@@ -15,7 +15,7 @@ Inspired by [`ha-govee-led-ble`](https://github.com/teh-hippo/ha-govee-led-ble):
 | Measurement kind | `kinds.py` | Record fields, device and per-person sensors, long-term statistics, the short text used in notifications and the activity log |
 | Core | `coordinator.py`, `sensor.py`, `button.py`, `messages.py`, `logbook.py` | Sessions, people, the attribution queue, notifications, statistics, events |
 
-A protocol session receives the coordinator, a connected `BleakClient` and an `asyncio.Event` set on disconnection. It calls `coordinator.async_add_record(record)` for each measurement, `coordinator.async_synced()` after each batch, and may fill `coordinator.data` with `battery`, `model_number` and `firmware`. A record carries at least `timestamp` (ISO 8601, UTC), the kind's value fields and `raw_hex`, plus `user` when the device has its own users.
+A protocol session receives the coordinator, a connected `BleakClient` and an `asyncio.Event` set on disconnection. It awaits `coordinator.async_add_record(record)` for each measurement, `await coordinator.async_synced()` after each batch, and may fill `coordinator.data` with `battery`, `model_number` and `firmware`. A record carries at least `timestamp` (ISO 8601, UTC), the kind's value fields and `raw_hex`, plus `user` when the device has its own users.
 
 ---
 

@@ -84,7 +84,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._unsubscribe_ble: CALLBACK_TYPE | None = None
         self._unsubscribe_actions: CALLBACK_TYPE = lambda: None
         self._sync_lock = asyncio.Lock()
-        self._store: Store[list[dict[str, Any]]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
+        self._store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         # Measurements waiting to be attributed, oldest first
         self.pending: list[dict[str, Any]] = []
 
@@ -100,7 +100,13 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_setup(self) -> None:
         """Load pending measurements and listen for the device waking up."""
-        self.pending = await self._store.async_load() or []
+        stored = await self._store.async_load() or {}
+        # Versions up to 0.1.15 stored only the pending list.
+        if isinstance(stored, list):
+            stored = {"pending": stored}
+        self.pending = stored.get("pending", [])
+        self.data["latest_record"] = stored.get("latest_record", {})
+        self.data["last_synced"] = stored.get("last_synced")
         for record in self.pending:
             record.setdefault("id", _record_id(record))
         self._async_update_pending_notification()
@@ -204,7 +210,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             elif persons:
                 record["id"] = _record_id(record)
                 self.pending.append(record)
-                await self._store.async_save(self.pending)
+                await self._async_save()
                 self._async_update_pending_notification()
                 await self._async_notify_phones(record, persons)
         self._async_dispatch_measurement_event(record)
@@ -213,11 +219,20 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for description in kind.device_sensors:
                 self.data[description.key] = record[description.key]
 
-    @callback
-    def async_synced(self) -> None:
-        """Note the end of a sync and refresh the entities."""
+    async def async_synced(self) -> None:
+        """Note the end of a sync, keep the latest record across restarts and refresh the entities."""
         self.data["last_synced"] = datetime.now().isoformat()
+        await self._async_save()
         self.async_set_updated_data(self.data)
+
+    async def _async_save(self) -> None:
+        await self._store.async_save(
+            {
+                "pending": self.pending,
+                "latest_record": self.data["latest_record"],
+                "last_synced": self.data["last_synced"],
+            }
+        )
 
     async def async_assign(self, record_id: str | None, subentry_id: str | None) -> None:
         """Attribute a pending measurement (the oldest when record_id is None) or drop it.
@@ -229,7 +244,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if record is None or (subentry_id and person is None):
             return
         self.pending.remove(record)
-        await self._store.async_save(self.pending)
+        await self._async_save()
         if person is not None:
             await self._async_attribute(record, person)
         else:

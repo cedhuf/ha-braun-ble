@@ -87,7 +87,7 @@ async def async_run_session(
     try:
         await client.start_notify(MEASUREMENT_UUID, lambda _char, data: payloads.put_nowait(bytes(data)))
         await async_read_identity(coordinator, client)
-        coordinator.async_synced()
+        await coordinator.async_synced()
         while True:
             try:
                 payload = await asyncio.wait_for(payloads.get(), timeout=SESSION_TIMEOUT)
@@ -98,6 +98,6 @@ async def async_run_session(
                 break
             local_tz = ZoneInfo(coordinator.hass.config.time_zone)
             await coordinator.async_add_record(parse_record(payload, local_tz))
-            coordinator.async_synced()
+            await coordinator.async_synced()
     finally:
         watcher.cancel()
