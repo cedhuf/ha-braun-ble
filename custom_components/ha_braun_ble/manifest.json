@@ -7,15 +7,6 @@
     },
     {
       "local_name": "TS4*"
-    },
-    {
-      "local_name": "BPU*"
-    },
-    {
-      "local_name": "BP6*"
-    },
-    {
-      "local_name": "BPM*"
     }
   ],
   "codeowners": ["@cedhuf"],
