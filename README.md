@@ -100,7 +100,12 @@ To skip attribution, pick a person under **Attribute every measurement automatic
 
 **Pending measurement is text, not a number**, so it has no graph or statistics: it is a waiting list. Temperature curves live on **Last measurement** (every reading, whoever it was for) and on each person's **Temperature**. Without any person declared, readings are never queued and only **Last measurement** is updated, which is all you need for live use.
 
-**Blood pressure monitors** have their own users A and B. Link each to a person at setup, or with **Device user** when adding a person: their readings then skip the queue. Readings from an unlinked user wait to be attributed like a thermometer's.
+**Blood pressure monitors** have two user buttons, A and B, and report which one was used:
+
+- a **button with a name** sends its readings straight to that person;
+- a **button without a name** sends each reading to the attribution queue, offering every person declared on the monitor.
+
+For example: button A for you, button B shared by the rest of the family. Name button A, leave button B without a name, and add each family member as another person. To be asked about every reading whatever the button, turn on **Always ask who the measurement was for** in the device options.
 
 **Upgrading from 0.1.8:** person temperature sensors had a state class for one release. Home Assistant then reports that the entity *no longer has a state class*; deleting those old statistics is safe, as the real per-person curve is the `ha_braun_ble:<id>_temperature` statistic.
 

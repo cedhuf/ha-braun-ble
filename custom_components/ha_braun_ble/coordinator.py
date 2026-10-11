@@ -37,6 +37,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
+    CONF_ALWAYS_ASK,
     CONF_DEFAULT_PERSON,
     CONF_DEVICE_USER,
     CONF_MODEL,
@@ -191,10 +192,9 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             default = None
             if not self.profile.device_users:
                 default = self.entry.subentries.get(self.entry.options.get(CONF_DEFAULT_PERSON) or "")
-            linked = next(
-                (p for p in persons if record.get("user") and p.data.get(CONF_DEVICE_USER) == record["user"]),
-                None,
-            )
+            linked = None
+            if record.get("user") and not self.entry.options.get(CONF_ALWAYS_ASK):
+                linked = next((p for p in persons if p.data.get(CONF_DEVICE_USER) == record["user"]), None)
             if linked or default:
                 await self._async_attribute(record, linked or default)
             elif persons:

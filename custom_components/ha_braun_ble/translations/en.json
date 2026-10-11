@@ -50,18 +50,20 @@
       },
       "people_with_users": {
         "title": "Who uses this blood pressure monitor?",
-        "description": "The monitor has two user buttons, A and B, and reports which one was used. Give the first name of the person behind each button: their measurements go straight to them. Leave a button empty to attribute its measurements yourself, by notification or from the device page; the other people below are the choices offered then (a guest, for example).",
+        "description": "The monitor has two user buttons, A and B, and reports which one was used for each measurement.\n\n- **Button with a name**: its measurements go straight to that person.\n- **Button without a name**: you are asked about every measurement taken with it, by notification or from the device page, among all the people declared here.\n\nExample: button A for you, button B shared by the rest of the family. Give button A your name, leave button B without a name and add each family member under \"Other people\".",
         "data": {
           "user_A": "Person on button A",
           "user_B": "Person on button B",
           "people": "Other people",
-          "notify": "Phones asked to attribute a measurement"
+          "notify": "Phones asked to attribute a measurement",
+          "always_ask": "Always ask who the measurement was for, whatever the button"
         },
         "data_description": {
-          "people": "Only useful for a button left empty. One first name per entry.",
+          "people": "People offered for the measurements of a button without a name (family, guests). One first name per entry.",
           "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing.",
-          "user_A": "Leave empty to attribute this button's measurements yourself.",
-          "user_B": "Leave empty to attribute this button's measurements yourself."
+          "user_A": "Leave empty if this button is shared: you will be asked about every measurement taken with it.",
+          "user_B": "Leave empty if this button is shared: you will be asked about every measurement taken with it.",
+          "always_ask": "The names of buttons A and B are then ignored: every measurement waits to be attributed."
         }
       }
     },
@@ -183,7 +185,7 @@
             "device_user": "Device user"
           },
           "data_description": {
-            "device_user": "User button on the device (A or B). Its measurements then go straight to this person."
+            "device_user": "This person's user button on the device (A or B): its measurements go straight to them. Leave empty for someone without a button of their own: they are offered for the measurements of a button without a name."
           }
         }
       }
@@ -205,10 +207,12 @@
       "init_with_users": {
         "title": "Options",
         "data": {
-          "notify": "Phones asked to attribute a measurement"
+          "notify": "Phones asked to attribute a measurement",
+          "always_ask": "Always ask who the measurement was for, whatever the button"
         },
         "data_description": {
-          "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing."
+          "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing.",
+          "always_ask": "The names of buttons A and B are then ignored: every measurement waits to be attributed."
         }
       }
     }

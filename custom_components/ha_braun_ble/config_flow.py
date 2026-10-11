@@ -36,6 +36,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_ALWAYS_ASK,
     CONF_AUTH_KEY,
     CONF_DEFAULT_PERSON,
     CONF_DEVICE_USER,
@@ -324,7 +325,10 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=self._title,
                 data=self._data,
-                options={CONF_NOTIFY: user_input.get(CONF_NOTIFY, [])},
+                options={
+                    CONF_NOTIFY: user_input.get(CONF_NOTIFY, []),
+                    **({CONF_ALWAYS_ASK: user_input.get(CONF_ALWAYS_ASK, False)} if users else {}),
+                },
                 subentries=[
                     ConfigSubentryData(
                         data=data, subentry_type=SUBENTRY_PERSON, title=name.strip(), unique_id=None
@@ -339,6 +343,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     **{vol.Optional(f"user_{user}"): str for user in users},
                     vol.Optional(CONF_PEOPLE): TextSelector(TextSelectorConfig(multiple=True)),
+                    **({vol.Required(CONF_ALWAYS_ASK, default=False): bool} if users else {}),
                     vol.Optional(CONF_NOTIFY): _notify_selector(self.hass),
                 }
             ),
@@ -402,6 +407,9 @@ class BraunOptionsFlow(OptionsFlow):
         model = SUPPORTED_MODELS.get(self.config_entry.data.get(CONF_MODEL, ""), DEFAULT_MODEL)
         # On devices with user buttons, the button decides; attributing everything is not offered.
         if model.device_users:
+            schema[
+                vol.Required(CONF_ALWAYS_ASK, default=self.config_entry.options.get(CONF_ALWAYS_ASK, False))
+            ] = bool
             return self.async_show_form(step_id="init_with_users", data_schema=vol.Schema(schema))
         return self.async_show_form(
             step_id="init",
