@@ -53,11 +53,11 @@ def encrypt_frame(plain: bytes, key: bytes, iv: bytes, counter: int) -> bytes:
 
 
 def compute_challenge_response(challenge: bytes, auth_key: bytes, session_iv: bytes) -> bytes:
-    """Compute 21-byte challenge response to authenticate with the device.
+    """Compute 17-byte challenge response to authenticate with the device.
 
     1. Encrypt challenge[:16] with auth_key and nonce AUTH_NONCE + 0x00.
     2. Extract 4 bytes from digest starting at challenge[16] % 16.
-    3. Return 4-byte slice + 12-byte session_iv + b'\\x01' (total 21 bytes).
+    3. Return 4-byte slice + 12-byte session_iv + b'\\x01' (total 17 bytes).
     """
     if len(challenge) < 17:
         raise ValueError(f"Challenge too short ({len(challenge)} bytes)")
