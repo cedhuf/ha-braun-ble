@@ -205,8 +205,8 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if RECORD_INDEX_REQUEST_UUID.lower() in chars and num_records > 0:
             # Query the newest records
             start_index = max(0, self._last_synced_record_index + 1)
-            # If records were cleared or reset, sync last few records
-            if start_index >= num_records:
+            # Memory was cleared on the device: resync from its latest record
+            if start_index > num_records:
                 start_index = max(0, num_records - 1)
 
             for idx in range(start_index, num_records):
@@ -245,6 +245,12 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if "age_group" in latest_record_data:
                 self.data["age_group"] = latest_record_data["age_group"]
             self.data["latest_record"] = latest_record_data
+
+        if self._last_synced_record_index != self.entry.data.get("last_synced_index", -1):
+            self.hass.config_entries.async_update_entry(
+                self.entry,
+                data={**self.entry.data, "last_synced_index": self._last_synced_record_index},
+            )
 
         self.data["last_synced"] = datetime.now().isoformat()
         self.async_set_updated_data(self.data)
