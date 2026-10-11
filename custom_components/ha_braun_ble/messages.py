@@ -53,5 +53,7 @@ def text(hass: HomeAssistant, key: str, record: dict[str, Any] | None = None, **
         values["details"] = kind.format_details(record, _language(hass))
         values["time"] = ""
         if timestamp := record.get("timestamp"):
-            values["time"] = dt_util.as_local(datetime.fromisoformat(timestamp)).strftime("%d/%m %H:%M")
+            # Day first in French; English spells the month out to stay unambiguous.
+            fmt = "%d/%m %H:%M" if _language(hass) == "fr" else "%b %d %H:%M"
+            values["time"] = dt_util.as_local(datetime.fromisoformat(timestamp)).strftime(fmt)
     return TEXTS[_language(hass)][key].format(**values)
