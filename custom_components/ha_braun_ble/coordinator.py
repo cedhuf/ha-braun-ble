@@ -188,7 +188,9 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         record["kind"] = kind.key
         if kind.is_measurement(record):
             persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
-            default = self.entry.subentries.get(self.entry.options.get(CONF_DEFAULT_PERSON) or "")
+            default = None
+            if not self.profile.device_users:
+                default = self.entry.subentries.get(self.entry.options.get(CONF_DEFAULT_PERSON) or "")
             linked = next(
                 (p for p in persons if record.get("user") and p.data.get(CONF_DEVICE_USER) == record["user"]),
                 None,

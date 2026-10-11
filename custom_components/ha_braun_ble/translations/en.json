@@ -41,25 +41,27 @@
         "description": "The thermometer does not know who is being measured. Every measurement therefore waits to be attributed: the \"Pending measurement\" sensor on the device shows the oldest one, and one button per person files it, as does the notification sent to the phones chosen below (or \"Ignore pending measurement\" for a failed reading). Add the people to follow here; you can add or remove people later from the device page.",
         "data": {
           "people": "People",
-          "notify": "Phones asked who each measurement was for"
+          "notify": "Phones asked to attribute a measurement"
         },
         "data_description": {
           "people": "One first name per entry. Leave empty to add people later.",
-          "notify": "Phones running the Home Assistant app. Each new measurement sends a notification with one button per person."
+          "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing."
         }
       },
       "people_with_users": {
-        "title": "Who uses this thermometer?",
-        "description": "This monitor has its own users A and B: their measurements go straight to the person named here. Measurements from other users wait to be attributed, by the notification sent to the phones chosen below or from the device page.",
+        "title": "Who uses this blood pressure monitor?",
+        "description": "The monitor has two user buttons, A and B, and reports which one was used. Give the first name of the person behind each button: their measurements go straight to them. Leave a button empty to attribute its measurements yourself, by notification or from the device page; the other people below are the choices offered then (a guest, for example).",
         "data": {
-          "user_A": "First name of device user A",
-          "user_B": "First name of device user B",
-          "people": "People",
-          "notify": "Phones asked who each measurement was for"
+          "user_A": "Person on button A",
+          "user_B": "Person on button B",
+          "people": "Other people",
+          "notify": "Phones asked to attribute a measurement"
         },
         "data_description": {
-          "people": "One first name per entry. Leave empty to add people later.",
-          "notify": "Phones running the Home Assistant app. Each new measurement sends a notification with one button per person."
+          "people": "Only useful for a button left empty. One first name per entry.",
+          "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing.",
+          "user_A": "Leave empty to attribute this button's measurements yourself.",
+          "user_B": "Leave empty to attribute this button's measurements yourself."
         }
       }
     },
@@ -74,7 +76,8 @@
     "abort": {
       "already_configured": "This Braun device is already configured.",
       "not_supported": "This device is not a supported Braun model."
-    }
+    },
+    "flow_title": "{name}"
   },
   "entity": {
     "sensor": {
@@ -137,6 +140,14 @@
       },
       "pulse": {
         "name": "Pulse"
+      },
+      "age_profile": {
+        "name": "Age profile",
+        "state": {
+          "0_3_months": "0-3 months",
+          "3_36_months": "3-36 months",
+          "over_36_months": "Over 36 months"
+        }
       }
     },
     "button": {
@@ -183,12 +194,21 @@
       "init": {
         "title": "Options",
         "data": {
-          "notify": "Phones asked who each measurement was for",
+          "notify": "Phones asked to attribute a measurement",
           "default_person": "Attribute every measurement automatically to"
         },
         "data_description": {
-          "notify": "Phones running the Home Assistant app. Each new measurement sends a notification with one button per person.",
+          "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing.",
           "default_person": "Leave empty so each measurement waits to be attributed. A guest's or a visiting child's reading would otherwise land in this person's history."
+        }
+      },
+      "init_with_users": {
+        "title": "Options",
+        "data": {
+          "notify": "Phones asked to attribute a measurement"
+        },
+        "data_description": {
+          "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing."
         }
       }
     }

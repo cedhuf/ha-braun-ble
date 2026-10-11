@@ -23,6 +23,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.util import slugify
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import (
     EntitySelector,
@@ -59,10 +60,20 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _notify_selector(hass: HomeAssistant) -> SelectSelector:
-    """Offer the phones running the Home Assistant app, which support action buttons."""
+    """Offer the phones running the Home Assistant app, which support action buttons, by name."""
+    # The app's notify service is "mobile_app_" plus the slugified device name.
+    names = {
+        f"mobile_app_{slugify(entry.data.get('device_name', ''))}": entry.data.get("device_name")
+        for entry in hass.config_entries.async_entries("mobile_app")
+    }
     services = hass.services.async_services_for_domain("notify")
     phones = sorted(name for name in services if name.startswith("mobile_app_"))
-    return SelectSelector(SelectSelectorConfig(options=phones, multiple=True))
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[SelectOptionDict(value=phone, label=names.get(phone) or phone) for phone in phones],
+            multiple=True,
+        )
+    )
 
 
 class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -108,6 +119,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._address = discovery_info.address
         self._device_name = discovery_info.name or f"Braun {discovery_info.address}"
         self._profile = profile
+        self.context["title_placeholders"] = {"name": profile.name}
         return await self._async_after_address()
 
     async def async_step_user(
@@ -371,18 +383,31 @@ class PersonSubentryFlow(ConfigSubentryFlow):
 class BraunOptionsFlow(OptionsFlow):
     """Device options."""
 
+    async def async_step_init_with_users(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Same as init, for devices with their own user buttons."""
+        return await self.async_step_init(user_input)
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Choose the phones to notify and an optional person to attribute everything to."""
         if user_input is not None:
             return self.async_create_entry(data=user_input)
 
+        schema: dict[Any, Any] = {
+            vol.Optional(
+                CONF_NOTIFY, default=self.config_entry.options.get(CONF_NOTIFY, [])
+            ): _notify_selector(self.hass),
+        }
+        model = SUPPORTED_MODELS.get(self.config_entry.data.get(CONF_MODEL, ""), DEFAULT_MODEL)
+        # On devices with user buttons, the button decides; attributing everything is not offered.
+        if model.device_users:
+            return self.async_show_form(step_id="init_with_users", data_schema=vol.Schema(schema))
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(
-                        CONF_NOTIFY, default=self.config_entry.options.get(CONF_NOTIFY, [])
-                    ): _notify_selector(self.hass),
+                    **schema,
                     vol.Optional(
                         CONF_DEFAULT_PERSON,
                         description={"suggested_value": self.config_entry.options.get(CONF_DEFAULT_PERSON)},

@@ -41,25 +41,27 @@
         "description": "Le thermomètre ne sait pas qui est mesuré. Chaque mesure attend donc d'être attribuée : le capteur « Mesure à attribuer » de l'appareil affiche la plus ancienne, et un bouton par personne la range, tout comme la notification envoyée aux téléphones choisis ci-dessous (ou « Ignorer la mesure en attente » pour une mesure ratée). Déclarez ici les personnes à suivre ; vous pourrez en ajouter ou en retirer plus tard depuis la page de l'appareil.",
         "data": {
           "people": "Personnes",
-          "notify": "Téléphones à qui demander pour qui est chaque mesure"
+          "notify": "Téléphones prévenus pour attribuer une mesure"
         },
         "data_description": {
           "people": "Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
-          "notify": "Téléphones avec l'app Home Assistant. Chaque nouvelle mesure envoie une notification avec un bouton par personne."
+          "notify": "Uniquement pour les mesures à attribuer : une notification avec un bouton par personne. Une mesure attribuée automatiquement n'envoie rien."
         }
       },
       "people_with_users": {
-        "title": "Qui utilise ce thermomètre ?",
-        "description": "Ce tensiomètre a ses propres utilisateurs A et B : leurs mesures vont directement à la personne indiquée ici. Les mesures des autres attendent d'être attribuées, par la notification envoyée aux téléphones choisis ci-dessous ou depuis la page de l'appareil.",
+        "title": "Qui utilise ce tensiomètre ?",
+        "description": "Le tensiomètre a deux boutons utilisateur, A et B, et indique lequel a servi. Donnez le prénom de la personne derrière chaque bouton : ses mesures lui iront directement. Laissez un bouton vide pour attribuer vous-même ses mesures, par notification ou depuis la page de l'appareil ; les autres personnes ci-dessous seront alors les choix proposés (un invité, par exemple).",
         "data": {
-          "user_A": "Prénom de l'utilisateur A de l'appareil",
-          "user_B": "Prénom de l'utilisateur B de l'appareil",
-          "people": "Personnes",
-          "notify": "Téléphones à qui demander pour qui est chaque mesure"
+          "user_A": "Personne du bouton A",
+          "user_B": "Personne du bouton B",
+          "people": "Autres personnes",
+          "notify": "Téléphones prévenus pour attribuer une mesure"
         },
         "data_description": {
-          "people": "Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
-          "notify": "Téléphones avec l'app Home Assistant. Chaque nouvelle mesure envoie une notification avec un bouton par personne."
+          "people": "Utile seulement pour un bouton laissé vide. Un prénom par champ.",
+          "notify": "Uniquement pour les mesures à attribuer : une notification avec un bouton par personne. Une mesure attribuée automatiquement n'envoie rien.",
+          "user_A": "Laissez vide pour attribuer vous-même les mesures de ce bouton.",
+          "user_B": "Laissez vide pour attribuer vous-même les mesures de ce bouton."
         }
       }
     },
@@ -74,7 +76,8 @@
     "abort": {
       "already_configured": "Cet appareil Braun est déjà configuré.",
       "not_supported": "Cet appareil n'est pas un modèle Braun pris en charge."
-    }
+    },
+    "flow_title": "{name}"
   },
   "entity": {
     "sensor": {
@@ -137,6 +140,14 @@
       },
       "pulse": {
         "name": "Pouls"
+      },
+      "age_profile": {
+        "name": "Profil d'âge",
+        "state": {
+          "0_3_months": "0-3 mois",
+          "3_36_months": "3-36 mois",
+          "over_36_months": "Plus de 36 mois"
+        }
       }
     },
     "button": {
@@ -183,12 +194,21 @@
       "init": {
         "title": "Options",
         "data": {
-          "notify": "Téléphones à qui demander pour qui est chaque mesure",
+          "notify": "Téléphones prévenus pour attribuer une mesure",
           "default_person": "Attribuer automatiquement toutes les mesures à"
         },
         "data_description": {
-          "notify": "Téléphones avec l'app Home Assistant. Chaque nouvelle mesure envoie une notification avec un bouton par personne.",
+          "notify": "Uniquement pour les mesures à attribuer : une notification avec un bouton par personne. Une mesure attribuée automatiquement n'envoie rien.",
           "default_person": "Laissez vide pour que chaque mesure attende d'être attribuée. Sinon, la mesure d'un invité ou d'un enfant de passage finirait dans l'historique de cette personne."
+        }
+      },
+      "init_with_users": {
+        "title": "Options",
+        "data": {
+          "notify": "Téléphones prévenus pour attribuer une mesure"
+        },
+        "data_description": {
+          "notify": "Uniquement pour les mesures à attribuer : une notification avec un bouton par personne. Une mesure attribuée automatiquement n'envoie rien."
         }
       }
     }

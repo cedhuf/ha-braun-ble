@@ -88,6 +88,13 @@ TEMPERATURE = MeasurementKind(
             record_attributes=True,
         ),
         BraunSensorDescription(
+            key="age_profile",
+            translation_key="age_profile",
+            device_class=SensorDeviceClass.ENUM,
+            options=["0_3_months", "3_36_months", "over_36_months"],
+            icon="mdi:human-child",
+        ),
+        BraunSensorDescription(
             key="ambient_temperature",
             translation_key="ambient_temperature",
             device_class=SensorDeviceClass.TEMPERATURE,
