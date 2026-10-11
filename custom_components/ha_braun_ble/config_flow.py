@@ -14,19 +14,33 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-from homeassistant.config_entries import ConfigEntry, ConfigSubentryFlow, SubentryFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlowResult,
+    ConfigSubentryData,
+    ConfigSubentryFlow,
+    OptionsFlow,
+    SubentryFlowResult,
+)
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+)
 
 from .const import (
     CHALLENGE_RECOVERY_UUID,
     CHALLENGE_REQUEST_UUID,
     CHALLENGE_RESPONSE_UUID,
     CONF_AUTH_KEY,
+    CONF_AUTO_ASSIGN,
     CONF_ENC_KEY,
     CONF_MODEL,
+    CONF_PEOPLE,
     CONF_PERSON,
     CONF_PIN,
     DOMAIN,
@@ -56,6 +70,12 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Return the subentry types this device supports."""
         return {SUBENTRY_PERSON: PersonSubentryFlow}
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Return the options flow."""
+        return BraunOptionsFlow()
+
     def __init__(self) -> None:
         """Initialize flow state."""
         self._discovered_devices: dict[str, str] = {}
@@ -63,6 +83,8 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._device_name: str | None = None
         self._recovery_iv: bytes | None = None
         self._encrypted_keys: bytes | None = None
+        self._title = ""
+        self._data: dict[str, str] = {}
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -145,15 +167,14 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
 
                 profile = get_model_profile_by_name(user_input.get(CONF_MODEL))
-                return self.async_create_entry(
-                    title=profile.name,
-                    data={
-                        CONF_ADDRESS: address,
-                        CONF_AUTH_KEY: auth_key,
-                        CONF_ENC_KEY: enc_key,
-                        CONF_MODEL: profile.model_id,
-                    },
-                )
+                self._title = profile.name
+                self._data = {
+                    CONF_ADDRESS: address,
+                    CONF_AUTH_KEY: auth_key,
+                    CONF_ENC_KEY: enc_key,
+                    CONF_MODEL: profile.model_id,
+                }
+                return await self.async_step_people()
 
         schema = vol.Schema(
             {
@@ -277,15 +298,14 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         enc_key = decrypted[16:32].hex()
 
                         profile = get_model_profile_by_name(self._device_name)
-                        return self.async_create_entry(
-                            title=profile.name,
-                            data={
-                                CONF_ADDRESS: self._address,
-                                CONF_AUTH_KEY: auth_key,
-                                CONF_ENC_KEY: enc_key,
-                                CONF_MODEL: profile.model_id,
-                            },
-                        )
+                        self._title = profile.name
+                        self._data = {
+                            CONF_ADDRESS: self._address,
+                            CONF_AUTH_KEY: auth_key,
+                            CONF_ENC_KEY: enc_key,
+                            CONF_MODEL: profile.model_id,
+                        }
+                        return await self.async_step_people()
 
                 except Exception as err:
                     _LOGGER.error("Failed to decrypt keys with entered PIN: %s", err)
@@ -302,6 +322,35 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
+    async def async_step_people(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Explain attribution and let the user declare people right away."""
+        if user_input is not None:
+            names = [name.strip() for name in user_input.get(CONF_PEOPLE, []) if name.strip()]
+            return self.async_create_entry(
+                title=self._title,
+                data=self._data,
+                options={CONF_AUTO_ASSIGN: user_input[CONF_AUTO_ASSIGN]},
+                subentries=[
+                    ConfigSubentryData(
+                        data={CONF_NAME: name},
+                        subentry_type=SUBENTRY_PERSON,
+                        title=name,
+                        unique_id=None,
+                    )
+                    for name in names
+                ],
+            )
+
+        return self.async_show_form(
+            step_id="people",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_PEOPLE): TextSelector(TextSelectorConfig(multiple=True)),
+                    vol.Required(CONF_AUTO_ASSIGN, default=False): bool,
+                }
+            ),
+        )
+
 class PersonSubentryFlow(ConfigSubentryFlow):
     """Add a person measurements can be attributed to."""
 
@@ -316,6 +365,27 @@ class PersonSubentryFlow(ConfigSubentryFlow):
                 {
                     vol.Required(CONF_NAME): str,
                     vol.Optional(CONF_PERSON): EntitySelector(EntitySelectorConfig(domain="person")),
+                }
+            ),
+        )
+
+
+class BraunOptionsFlow(OptionsFlow):
+    """Device options."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Let the user opt in to automatic attribution."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_AUTO_ASSIGN,
+                        default=self.config_entry.options.get(CONF_AUTO_ASSIGN, False),
+                    ): bool,
                 }
             ),
         )

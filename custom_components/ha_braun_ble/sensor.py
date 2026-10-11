@@ -12,9 +12,8 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -40,6 +39,26 @@ BATTERY = SensorEntityDescription(
 )
 
 
+AMBIENT_TEMPERATURE = SensorEntityDescription(
+    key="ambient_temperature",
+    translation_key="ambient_temperature",
+    device_class=SensorDeviceClass.TEMPERATURE,
+    state_class=SensorStateClass.MEASUREMENT,
+    native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    entity_registry_enabled_default=False,
+)
+MODEL_NUMBER = SensorEntityDescription(
+    key="model_number",
+    translation_key="model_number",
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+FIRMWARE = SensorEntityDescription(
+    key="firmware",
+    translation_key="firmware",
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -49,17 +68,14 @@ async def async_setup_entry(
     coordinator: BraunDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     persons = entry.get_subentries_of_type(SUBENTRY_PERSON)
 
-    expected = {f"{coordinator.address}_{d.key}" for d in (TEMPERATURE, BATTERY)}
-    expected |= {f"{person.subentry_id}_temperature" for person in persons}
-    ent_reg = er.async_get(hass)
-    for stale in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
-        if stale.domain == "sensor" and stale.unique_id not in expected:
-            ent_reg.async_remove(stale.entity_id)
-
     async_add_entities(
         [
             BraunTemperatureSensor(coordinator, TEMPERATURE),
             BraunSensor(coordinator, BATTERY),
+            BraunSensor(coordinator, AMBIENT_TEMPERATURE),
+            BraunSensor(coordinator, MODEL_NUMBER),
+            BraunSensor(coordinator, FIRMWARE),
+            BraunPendingSensor(coordinator),
         ]
     )
     for person in persons:
@@ -69,7 +85,7 @@ async def async_setup_entry(
         )
 
 
-def _device_info(coordinator: BraunDataUpdateCoordinator) -> DeviceInfo:
+def device_info(coordinator: BraunDataUpdateCoordinator) -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, coordinator.address)},
         name=coordinator.entry.title,
@@ -78,7 +94,7 @@ def _device_info(coordinator: BraunDataUpdateCoordinator) -> DeviceInfo:
     )
 
 
-class BraunSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEntity):
+class BraunSensor(CoordinatorEntity[BraunDataUpdateCoordinator], RestoreSensor):
     """Sensor reading one key of the coordinator data."""
 
     _attr_has_entity_name = True
@@ -90,10 +106,17 @@ class BraunSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEntity):
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.address}_{description.key}"
-        self._attr_device_info = _device_info(coordinator)
+        self._attr_device_info = device_info(coordinator)
+
+    async def async_added_to_hass(self) -> None:
+        """Show the last known value until the device next connects."""
+        await super().async_added_to_hass()
+        key = self.entity_description.key
+        if self.coordinator.data.get(key) is None and (last := await self.async_get_last_sensor_data()):
+            self.coordinator.data[key] = last.native_value
 
     @property
-    def native_value(self) -> float | int | None:
+    def native_value(self) -> float | int | str | None:
         """Return the value stored under this sensor's key."""
         return self.coordinator.data.get(self.entity_description.key)
 
@@ -120,7 +143,6 @@ class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator]
     _attr_has_entity_name = True
     _attr_translation_key = "person_temperature"
     _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
 
     def __init__(self, coordinator: BraunDataUpdateCoordinator, person: ConfigSubentry) -> None:
@@ -144,7 +166,9 @@ class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator]
             state := await self.async_get_last_state()
         ):
             self._attr_native_value = data.native_value
-            self._attr_extra_state_attributes = {"measured_at": state.attributes.get("measured_at")}
+            self._attr_extra_state_attributes = {
+                key: state.attributes.get(key) for key in ("measured_at", "ambient_temperature")
+            }
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -153,5 +177,38 @@ class BraunPersonTemperatureSensor(CoordinatorEntity[BraunDataUpdateCoordinator]
         shown = self._attr_extra_state_attributes["measured_at"]
         if record and (shown is None or record["timestamp"] >= shown):
             self._attr_native_value = record["temperature"]
-            self._attr_extra_state_attributes = {"measured_at": record["timestamp"]}
+            self._attr_extra_state_attributes = {
+                "measured_at": record["timestamp"],
+                "ambient_temperature": record["ambient_temperature"],
+            }
         super()._handle_coordinator_update()
+
+
+class BraunPendingSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEntity):
+    """Oldest measurement still waiting to be attributed."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "pending"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+
+    def __init__(self, coordinator: BraunDataUpdateCoordinator) -> None:
+        """Initialize the pending measurement sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.address}_pending"
+        self._attr_device_info = device_info(coordinator)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the oldest pending temperature."""
+        return self.coordinator.pending[0]["temperature"] if self.coordinator.pending else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when it was measured and how many are waiting."""
+        oldest = self.coordinator.pending[0] if self.coordinator.pending else {}
+        return {
+            "measured_at": oldest.get("timestamp"),
+            "ambient_temperature": oldest.get("ambient_temperature"),
+            "waiting": len(self.coordinator.pending),
+        }

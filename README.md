@@ -16,10 +16,8 @@ Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and desig
 - **ESPHome Proxy Support**: Seamlessly syncs via local Bluetooth or any ESPHome Bluetooth Proxy.
 - **Guided Onboarding**: Interactive pairing wizard in Home Assistant that decrypts AES keys directly using the on-screen 6-digit PIN.
 - **Automatic Sync**: Passively listens for Bluetooth wake-up advertisements and retrieves new measurements automatically when you use the device.
-- **Sensors Exposed**:
-  - `sensor.<device>_temperature`: Body temperature in °C / °F, with measurement timestamp and ambient temperature.
-  - `sensor.<device>_battery`: Battery level percentage.
-- **Family Attribution Blueprint**: Ready-to-use actionable mobile notification to assign each reading to family members.
+- **Live Sync**: Stays connected while the thermometer is on, so each reading reaches Home Assistant within a second.
+- **Per-Person Readings**: Declare the people who use the device; each gets their own device with a temperature sensor and long-term statistics at the real measurement time.
 - **Apple Health (HealthKit) Bridge**: Seamlessly export readings into Apple Health via native iOS Shortcuts.
 
 ---
@@ -74,22 +72,31 @@ Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and desig
 
 ---
 
-## 👨‍👩‍👧‍👦 Family Attribution & Apple Health
+## 👨‍👩‍👧‍👦 People & Attribution
 
-Braun thermometers do not have per-person buttons on the device itself. Home Assistant makes attributing readings simple:
+The thermometer does not know who is being measured, so every reading waits to be attributed.
 
-### 1. Actionable Notification Blueprint
-Use our included blueprint:
-[`blueprints/automation/ha_braun_ble/person_attribution.yaml`](blueprints/automation/ha_braun_ble/person_attribution.yaml)
+1. **Declare people** at the end of the pairing wizard, or later with **Add person** on the thermometer's device page. A person only needs a first name; linking a Home Assistant person is optional, so children need no account.
+2. **Take readings** as usual. Each one lands in the **Pending measurement** sensor (the oldest waiting reading, with its time and the number still waiting).
+3. **Attribute them**, right away or the next day: press **Assign to <name>** on the thermometer's device page, or **Ignore pending measurement** for a failed reading. The next waiting reading then shows up.
 
-Whenever someone takes a temperature reading, your phone receives a push notification:
-> **🌡️ Braun Measurement: 38.4°C**  
-> *Who is this temperature reading for?*  
-> `[ Alice ]` `[ Bob ]` `[ Charlie ]`
+Each person appears as their own device with a **Temperature** sensor (latest reading, kept across restarts) and a long-term statistic `ha_braun_ble:<id>_temperature` dated at the real measurement time, for the *Statistics graph* card. The sensor's own history is dated when the reading was attributed.
 
-Tapping a name immediately writes the temperature to that person's dedicated sensor/helper.
+Automatic attribution can be turned on in the device options, and only applies when a single person is declared. It is off by default so that a guest's reading never lands in someone's history.
 
-### 2. Apple Health (HealthKit) Integration
+### Device sensors
+
+| Sensor | Content |
+|---|---|
+| Last measurement | Latest reading, whoever it was for |
+| Pending measurement | Oldest reading waiting to be attributed |
+| Battery | Battery level |
+| Ambient temperature | Ambient temperature at the last reading (disabled by default) |
+| Model, Firmware | Diagnostic |
+
+Every reading also fires a `ha_braun_ble_measurement` event for custom automations.
+
+### Apple Health (HealthKit)
 See our step-by-step guide in [docs/apple-health-setup.md](docs/apple-health-setup.md) to log temperature measurements directly into the iOS Health app via Apple Shortcuts.
 
 ---

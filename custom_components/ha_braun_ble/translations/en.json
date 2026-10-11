@@ -35,6 +35,18 @@
           "enc_key": "Encryption Key (32 hex characters)",
           "model": "Device Model"
         }
+      },
+      "people": {
+        "title": "Who uses this thermometer?",
+        "description": "The thermometer does not know who is being measured. Every measurement therefore waits to be attributed: the \"Pending measurement\" sensor on the device shows the oldest one, and one button per person files it (or \"Ignore pending measurement\" for a failed reading). Add the people to follow here; you can add or remove people later from the device page.",
+        "data": {
+          "people": "People",
+          "auto_assign": "Attribute measurements automatically when only one person is set up"
+        },
+        "data_description": {
+          "people": "One first name per entry. Leave empty to add people later.",
+          "auto_assign": "Off by default: a guest or a visiting child would otherwise end up in that person's history."
+        }
       }
     },
     "error": {
@@ -59,6 +71,26 @@
       },
       "person_temperature": {
         "name": "Temperature"
+      },
+      "pending": {
+        "name": "Pending measurement"
+      },
+      "ambient_temperature": {
+        "name": "Ambient temperature"
+      },
+      "model_number": {
+        "name": "Model"
+      },
+      "firmware": {
+        "name": "Firmware"
+      }
+    },
+    "button": {
+      "assign": {
+        "name": "Assign to {person}"
+      },
+      "ignore": {
+        "name": "Ignore pending measurement"
       }
     }
   },
@@ -76,6 +108,19 @@
             "name": "Name",
             "person": "Home Assistant person (optional)"
           }
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "auto_assign": "Attribute measurements automatically when only one person is set up"
+        },
+        "data_description": {
+          "auto_assign": "Off by default: a guest or a visiting child would otherwise end up in that person's history."
         }
       }
     }

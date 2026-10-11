@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 from typing import Any
@@ -18,9 +18,23 @@ from homeassistant.components.bluetooth import (
     BluetoothScanningMode,
     BluetoothServiceInfoBleak,
 )
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.models import (
+    StatisticData,
+    StatisticMeanType,
+    StatisticMetaData,
+)
+from homeassistant.components.recorder.statistics import (
+    async_add_external_statistics,
+    statistics_during_period,
+)
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
     ACK_OLDEST_RECORD,
@@ -28,10 +42,16 @@ from .const import (
     CHALLENGE_REQUEST_UUID,
     CHALLENGE_RESPONSE_UUID,
     CONF_AUTH_KEY,
+    CONF_AUTO_ASSIGN,
     CONF_ENC_KEY,
     CONF_MODEL,
+    DOMAIN,
+    EVENT_BRAUN_ATTRIBUTION,
+    EVENT_BRAUN_IGNORED,
     EVENT_BRAUN_MEASUREMENT,
     FINAL_TEMP_NOTIFICATION_UUID,
+    FIRMWARE_REVISION_UUID,
+    MODEL_NUMBER_UUID,
     READ_OLDEST_RECORD,
     RECORD_COUNT_UUID,
     RECORD_INDEX_REQUEST_UUID,
@@ -106,6 +126,9 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._unsubscribe_ble: CALLBACK_TYPE | None = None
         self._sync_lock = asyncio.Lock()
+        self._store: Store[list[dict[str, Any]]] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
+        # Measurements waiting to be attributed, oldest first
+        self.pending: list[dict[str, Any]] = []
 
         # In-memory sensor state cache
         self.data: dict[str, Any] = {
@@ -118,7 +141,8 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
     async def async_setup(self) -> None:
-        """Register passive Bluetooth listener to trigger sync when device wakes up."""
+        """Load pending measurements and listen for the device waking up."""
+        self.pending = await self._store.async_load() or []
         _LOGGER.debug("Setting up Bluetooth listener for %s (%s)", self.profile.name, self.address)
         self._unsubscribe_ble = bluetooth.async_register_callback(
             self.hass,
@@ -203,6 +227,8 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             battery = await client.read_gatt_char(BATTERY_LEVEL_UUID)
             self.data["battery"] = battery[0]
+            self.data["model_number"] = (await client.read_gatt_char(MODEL_NUMBER_UUID)).decode()
+            self.data["firmware"] = (await client.read_gatt_char(FIRMWARE_REVISION_UUID)).decode()
 
             sync = _RecordSync(client, self.enc_key, session_iv, records)
             await self._async_sync_pending(sync)
@@ -232,30 +258,92 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.debug("Device has %d new records", pending)
         for _ in range(pending):
             record = self.profile.record_parser(await sync.read_oldest())
-            persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
-            if len(persons) == 1 and "temperature" in record:
-                record["person"] = persons[0].title
-                self.data["persons"][persons[0].subentry_id] = record
+            if "temperature" in record:
+                persons = self.entry.get_subentries_of_type(SUBENTRY_PERSON)
+                if self.entry.options.get(CONF_AUTO_ASSIGN) and len(persons) == 1:
+                    await self._async_attribute(record, persons[0])
+                else:
+                    self.pending.append(record)
+                    await self._store.async_save(self.pending)
             self._async_dispatch_measurement_event(record)
             self.data["latest_record"] = record
             if "temperature" in record:
                 self.data["temperature"] = record["temperature"]
+                self.data["ambient_temperature"] = record["ambient_temperature"]
             await sync.ack_oldest()
 
         self.data["last_synced"] = datetime.now().isoformat()
         self.async_set_updated_data(self.data)
 
+    async def async_assign_oldest(self, subentry_id: str | None) -> None:
+        """Attribute the oldest pending measurement to a person, or drop it when None."""
+        if not self.pending:
+            return
+        record = self.pending.pop(0)
+        await self._store.async_save(self.pending)
+        if subentry_id is not None:
+            await self._async_attribute(record, self.entry.subentries[subentry_id])
+        else:
+            self._async_fire(EVENT_BRAUN_IGNORED, self.address, record)
+        self.async_update_listeners()
+
+    async def _async_attribute(self, record: dict[str, Any], person: ConfigSubentry) -> None:
+        """Give a measurement to a person and add it to their hourly statistics."""
+        record["person"] = person.title
+        self.data["persons"][person.subentry_id] = record
+        self._async_fire(EVENT_BRAUN_ATTRIBUTION, person.subentry_id, record)
+
+        # Statistics carry the real measurement time, unlike state history.
+        statistic_id = f"{DOMAIN}:{person.subentry_id.lower()}_temperature"
+        value = record["temperature"]
+        hour = datetime.fromisoformat(record["timestamp"]).replace(minute=0, second=0, microsecond=0)
+        existing = await get_instance(self.hass).async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            hour,
+            hour + timedelta(hours=1),
+            {statistic_id},
+            "hour",
+            None,
+            {"mean", "min", "max"},
+        )
+        low = high = mean = value
+        if rows := existing.get(statistic_id):
+            low, high = min(rows[0]["min"], value), max(rows[0]["max"], value)
+            # ponytail: mean of the stored mean and the new value, exact only for two per hour
+            mean = (rows[0]["mean"] + value) / 2
+        async_add_external_statistics(
+            self.hass,
+            StatisticMetaData(
+                mean_type=StatisticMeanType.ARITHMETIC,
+                has_sum=False,
+                name=f"{person.title} {self.entry.title}",
+                source=DOMAIN,
+                statistic_id=statistic_id,
+                unit_class=TemperatureConverter.UNIT_CLASS,
+                unit_of_measurement=UnitOfTemperature.CELSIUS,
+            ),
+            [StatisticData(start=hour, mean=mean, min=low, max=high)],
+        )
+
     def _async_dispatch_measurement_event(self, record: dict[str, Any]) -> None:
-        """Fire event on Home Assistant event bus for automations / person assignment."""
+        """Fire the measurement event, for automations and the device activity log."""
+        self._async_fire(EVENT_BRAUN_MEASUREMENT, self.address, record)
+
+    @callback
+    def _async_fire(self, event_type: str, device_identifier: str, record: dict[str, Any]) -> None:
+        """Fire an event tied to a device, so it shows in that device's activity."""
+        device = dr.async_get(self.hass).async_get_device(identifiers={(DOMAIN, device_identifier)})
         event_data = {
+            "device_id": device.id if device else None,
             "entry_id": self.entry.entry_id,
             "device_address": self.address,
             "device_name": self.entry.title,
             "model": self.profile.name,
             **record,
         }
-        _LOGGER.info("Firing %s event: %s", EVENT_BRAUN_MEASUREMENT, event_data)
-        self.hass.bus.async_fire(EVENT_BRAUN_MEASUREMENT, event_data)
+        _LOGGER.debug("Firing %s event: %s", event_type, event_data)
+        self.hass.bus.async_fire(event_type, event_data)
 
     async def async_unload(self) -> None:
         """Unload coordinator and clean up listeners."""

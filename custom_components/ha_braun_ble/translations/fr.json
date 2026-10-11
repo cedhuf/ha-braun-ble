@@ -35,6 +35,18 @@
           "enc_key": "Clé de chiffrement (32 caractères hexadécimaux)",
           "model": "Modèle d'appareil"
         }
+      },
+      "people": {
+        "title": "Qui utilise ce thermomètre ?",
+        "description": "Le thermomètre ne sait pas qui est mesuré. Chaque mesure attend donc d'être attribuée : le capteur « Mesure à attribuer » de l'appareil affiche la plus ancienne, et un bouton par personne la range (ou « Ignorer la mesure en attente » pour une mesure ratée). Déclarez ici les personnes à suivre ; vous pourrez en ajouter ou en retirer plus tard depuis la page de l'appareil.",
+        "data": {
+          "people": "Personnes",
+          "auto_assign": "Attribuer automatiquement les mesures quand une seule personne est déclarée"
+        },
+        "data_description": {
+          "people": "Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
+          "auto_assign": "Désactivé par défaut : sinon, la mesure d'un invité ou d'un enfant de passage finirait dans l'historique de cette personne."
+        }
       }
     },
     "error": {
@@ -59,6 +71,26 @@
       },
       "person_temperature": {
         "name": "Température"
+      },
+      "pending": {
+        "name": "Mesure à attribuer"
+      },
+      "ambient_temperature": {
+        "name": "Température ambiante"
+      },
+      "model_number": {
+        "name": "Modèle"
+      },
+      "firmware": {
+        "name": "Firmware"
+      }
+    },
+    "button": {
+      "assign": {
+        "name": "Attribuer à {person}"
+      },
+      "ignore": {
+        "name": "Ignorer la mesure en attente"
       }
     }
   },
@@ -76,6 +108,19 @@
             "name": "Prénom",
             "person": "Personne Home Assistant (facultatif)"
           }
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "auto_assign": "Attribuer automatiquement les mesures quand une seule personne est déclarée"
+        },
+        "data_description": {
+          "auto_assign": "Désactivé par défaut : sinon, la mesure d'un invité ou d'un enfant de passage finirait dans l'historique de cette personne."
         }
       }
     }
