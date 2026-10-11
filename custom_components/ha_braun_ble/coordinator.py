@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Any
 
-from bleak import BleakClient, BleakError
+from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak_retry_connector import establish_connection
 
@@ -25,13 +25,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     BATTERY_LEVEL_UUID,
-    CHALLENGE_RECOVERY_UUID,
     CHALLENGE_REQUEST_UUID,
     CHALLENGE_RESPONSE_UUID,
     CONF_AUTH_KEY,
     CONF_ENC_KEY,
     CONF_MODEL,
-    DOMAIN,
     EVENT_BRAUN_MEASUREMENT,
     FINAL_TEMP_NOTIFICATION_UUID,
     RECORD_COUNT_UUID,
@@ -75,7 +73,6 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # In-memory sensor state cache
         self.data: dict[str, Any] = {
             "temperature": None,
-            "unit": "°C",
             "age_group": None,
             "fever_status": None,
             "battery": None,
@@ -243,7 +240,6 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if latest_record_data:
             if "temperature" in latest_record_data:
                 self.data["temperature"] = latest_record_data["temperature"]
-                self.data["unit"] = latest_record_data.get("unit", "°C")
             if "fever_status" in latest_record_data:
                 self.data["fever_status"] = latest_record_data["fever_status"]
             if "age_group" in latest_record_data:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
 
 from .const import AUTH_NONCE, RECOVERY_KEY_TEMPLATE

@@ -20,6 +20,28 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import BraunDataUpdateCoordinator
 
+TEMPERATURE = SensorEntityDescription(
+    key="temperature",
+    translation_key="temperature",
+    device_class=SensorDeviceClass.TEMPERATURE,
+    state_class=SensorStateClass.MEASUREMENT,
+    native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    icon="mdi:thermometer",
+)
+BATTERY = SensorEntityDescription(
+    key="battery",
+    translation_key="battery",
+    device_class=SensorDeviceClass.BATTERY,
+    state_class=SensorStateClass.MEASUREMENT,
+    native_unit_of_measurement=PERCENTAGE,
+)
+RECORD_COUNT = SensorEntityDescription(
+    key="record_count",
+    translation_key="stored_records",
+    state_class=SensorStateClass.TOTAL,
+    icon="mdi:counter",
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -28,26 +50,27 @@ async def async_setup_entry(
 ) -> None:
     """Set up Braun BLE sensors based on a config entry."""
     coordinator: BraunDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities(
+        [
+            BraunTemperatureSensor(coordinator, TEMPERATURE),
+            BraunSensor(coordinator, BATTERY),
+            BraunSensor(coordinator, RECORD_COUNT),
+        ]
+    )
 
-    entities: list[SensorEntity] = [
-        BraunTemperatureSensor(coordinator),
-        BraunBatterySensor(coordinator),
-        BraunRecordCountSensor(coordinator),
-    ]
 
-    async_add_entities(entities)
-
-
-class BraunEntity(CoordinatorEntity[BraunDataUpdateCoordinator]):
-    """Base class for Braun BLE entities."""
+class BraunSensor(CoordinatorEntity[BraunDataUpdateCoordinator], SensorEntity):
+    """Sensor reading one key of the coordinator data."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: BraunDataUpdateCoordinator, key: str) -> None:
-        """Initialize Braun entity."""
+    def __init__(
+        self, coordinator: BraunDataUpdateCoordinator, description: SensorEntityDescription
+    ) -> None:
+        """Initialize Braun sensor."""
         super().__init__(coordinator)
-        self._key = key
-        self._attr_unique_id = f"{coordinator.address}_{key}"
+        self.entity_description = description
+        self._attr_unique_id = f"{coordinator.address}_{description.key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.address)},
             name=coordinator.entry.title,
@@ -55,24 +78,14 @@ class BraunEntity(CoordinatorEntity[BraunDataUpdateCoordinator]):
             model=coordinator.profile.name,
         )
 
-
-class BraunTemperatureSensor(BraunEntity, SensorEntity):
-    """Sensor for the latest body temperature reading."""
-
-    _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
-    _attr_translation_key = "temperature"
-    _attr_icon = "mdi:thermometer"
-
-    def __init__(self, coordinator: BraunDataUpdateCoordinator) -> None:
-        """Initialize temperature sensor."""
-        super().__init__(coordinator, "temperature")
-
     @property
-    def native_value(self) -> float | None:
-        """Return the current temperature value."""
-        return self.coordinator.data.get("temperature")
+    def native_value(self) -> float | int | None:
+        """Return the value stored under this sensor's key."""
+        return self.coordinator.data.get(self.entity_description.key)
+
+
+class BraunTemperatureSensor(BraunSensor):
+    """Temperature sensor carrying metadata from the latest measurement."""
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -86,38 +99,3 @@ class BraunTemperatureSensor(BraunEntity, SensorEntity):
             "last_synced": self.coordinator.data.get("last_synced"),
             "raw_hex": rec.get("raw_hex"),
         }
-
-
-class BraunBatterySensor(BraunEntity, SensorEntity):
-    """Sensor for thermometer battery percentage."""
-
-    _attr_device_class = SensorDeviceClass.BATTERY
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_translation_key = "battery"
-
-    def __init__(self, coordinator: BraunDataUpdateCoordinator) -> None:
-        """Initialize battery sensor."""
-        super().__init__(coordinator, "battery")
-
-    @property
-    def native_value(self) -> int | None:
-        """Return the battery percentage."""
-        return self.coordinator.data.get("battery")
-
-
-class BraunRecordCountSensor(BraunEntity, SensorEntity):
-    """Sensor for the total number of records stored on the device."""
-
-    _attr_state_class = SensorStateClass.TOTAL
-    _attr_translation_key = "stored_records"
-    _attr_icon = "mdi:counter"
-
-    def __init__(self, coordinator: BraunDataUpdateCoordinator) -> None:
-        """Initialize records count sensor."""
-        super().__init__(coordinator, "record_count")
-
-    @property
-    def native_value(self) -> int | None:
-        """Return number of stored records."""
-        return self.coordinator.data.get("record_count")

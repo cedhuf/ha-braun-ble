@@ -15,7 +15,6 @@ from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.const import CONF_ADDRESS
-from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
@@ -169,12 +168,14 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Display pairing instructions (Power OFF -> hold button until blue screen with 'bt')."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
             # User confirmed device is in pairing mode; trigger BLE recovery handshake
             return await self._async_trigger_pairing()
 
+        return self._show_pairing_form()
+
+    def _show_pairing_form(self, error: str | None = None) -> FlowResult:
+        """Show the pairing prompt, with an optional base error."""
         return self.async_show_form(
             step_id="pairing_prompt",
             data_schema=vol.Schema({}),
@@ -182,7 +183,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "device_name": self._device_name or self._address,
                 "address": self._address,
             },
-            errors=errors,
+            errors={"base": error} if error else {},
         )
 
     async def _async_trigger_pairing(self) -> FlowResult:
@@ -191,11 +192,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.hass, self._address, connectable=True
         )
         if not ble_device:
-            return self.async_show_form(
-                step_id="pairing_prompt",
-                data_schema=vol.Schema({}),
-                errors={"base": "cannot_connect"},
-            )
+            return self._show_pairing_form("cannot_connect")
 
         keys_queue: asyncio.Queue[bytes] = asyncio.Queue()
 
@@ -208,11 +205,7 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         except Exception as err:
             _LOGGER.error("Pairing connection failed: %s", err)
-            return self.async_show_form(
-                step_id="pairing_prompt",
-                data_schema=vol.Schema({}),
-                errors={"base": "cannot_connect"},
-            )
+            return self._show_pairing_form("cannot_connect")
 
         try:
             # Subscribe to recovery notifications
@@ -234,18 +227,10 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._encrypted_keys = encrypted_payload
             
         except asyncio.TimeoutError:
-            return self.async_show_form(
-                step_id="pairing_prompt",
-                data_schema=vol.Schema({}),
-                errors={"base": "pairing_timeout"},
-            )
+            return self._show_pairing_form("pairing_timeout")
         except Exception as err:
             _LOGGER.error("Error during pairing handshake: %s", err)
-            return self.async_show_form(
-                step_id="pairing_prompt",
-                data_schema=vol.Schema({}),
-                errors={"base": "pairing_failed"},
-            )
+            return self._show_pairing_form("pairing_failed")
         finally:
             try:
                 await client.disconnect()

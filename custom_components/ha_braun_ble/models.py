@@ -67,12 +67,9 @@ def parse_thermoscan_record(payload: bytes) -> dict[str, Any]:
         elif 3200 <= raw_temp <= 4400:
             temp_c = raw_temp / 100.0
         else:
-            try:
-                candidate = round(_decode_sfloat(raw_temp), 1)
-                if 32.0 <= candidate <= 44.0:
-                    temp_c = candidate
-            except Exception:
-                pass
+            candidate = round(_decode_sfloat(raw_temp), 1)
+            if 32.0 <= candidate <= 44.0:
+                temp_c = candidate
 
         if temp_c is not None:
             result["temperature"] = round(temp_c, 1)
@@ -174,6 +171,6 @@ def get_model_profile_by_name(name: str | None) -> BraunModelProfile:
     name_clean = name.strip()
     for profile in SUPPORTED_MODELS.values():
         for prefix in profile.ble_name_prefixes:
-            if name_clean.startswith(prefix) or prefix.lower() in name_clean.lower():
+            if prefix.lower() in name_clean.lower():
                 return profile
     return DEFAULT_MODEL
