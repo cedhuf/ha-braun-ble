@@ -91,3 +91,8 @@ The device only serves measurements not yet synced ("new" ones). Measured on fir
 | others | Unknown (`5` = `00`, `10..11` = `00 01`, `16` = `0b` so far) |
 
 `RTC_TIME_UUID` decrypts to `00` + Unix time (4 bytes, UTC) + `00 00` + UTC offset in seconds (2 bytes).
+
+### 5. Live Measurements
+While a client stays connected, the device sends an indication on `FINAL_TEMP_NOTIFICATION_UUID` as soon as a measurement is taken, and the new-record count goes up at the same time. Decrypted, the indication is 10 bytes, little-endian: body temperature (float32, °C), ambient temperature (float32, °C), then `00 0b`.
+
+The device keeps the connection open while it is on and drops it when it turns itself off, about a minute after the last measurement. Its advertisement payload is identical at every power-on, so Home Assistant only reports it again once its advertisement history for the address is cleared (`bluetooth.async_clear_advertisement_history`, Home Assistant 2026.6+).

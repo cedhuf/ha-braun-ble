@@ -9,7 +9,6 @@ import os
 from typing import Any
 
 from bleak import BleakClient
-from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak_retry_connector import establish_connection
 
 from homeassistant.components import bluetooth
@@ -21,7 +20,7 @@ from homeassistant.components.bluetooth import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
     ACK_OLDEST_RECORD,
@@ -32,6 +31,7 @@ from .const import (
     CONF_ENC_KEY,
     CONF_MODEL,
     EVENT_BRAUN_MEASUREMENT,
+    FINAL_TEMP_NOTIFICATION_UUID,
     READ_OLDEST_RECORD,
     RECORD_COUNT_UUID,
     RECORD_INDEX_REQUEST_UUID,
@@ -45,6 +45,42 @@ from .crypto import (
 from .models import BraunModelProfile, SUPPORTED_MODELS, get_model_profile_by_name
 
 _LOGGER = logging.getLogger(__name__)
+
+
+SESSION_TIMEOUT = 300
+
+
+class _RecordSync:
+    """Encrypted record commands for one authenticated session."""
+
+    def __init__(
+        self, client: BleakClient, key: bytes, iv: bytes, records: asyncio.Queue[bytes]
+    ) -> None:
+        self._client = client
+        self._key = key
+        self._iv = iv
+        self._records = records
+        self._counter = 1
+
+    async def pending(self) -> int:
+        """Return the number of measurements not yet synced (second byte)."""
+        frame = await self._client.read_gatt_char(RECORD_COUNT_UUID)
+        return decrypt_frame(frame, self._key, self._iv)[1]
+
+    async def read_oldest(self) -> bytes:
+        """Return the decrypted oldest new record."""
+        await self._send(READ_OLDEST_RECORD)
+        frame = await asyncio.wait_for(self._records.get(), timeout=3.5)
+        return decrypt_frame(frame, self._key, self._iv)
+
+    async def ack_oldest(self) -> None:
+        """Mark the oldest new record as synced; the next one moves to index 0."""
+        await self._send(ACK_OLDEST_RECORD)
+
+    async def _send(self, command: bytes) -> None:
+        self._counter += 1
+        req = encrypt_frame(command, self._key, self._iv, self._counter)
+        await self._client.write_gatt_char(RECORD_INDEX_REQUEST_UUID, req, response=True)
 
 
 class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -110,98 +146,94 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self.data
 
     async def async_sync_device(self) -> None:
-        """Connect to thermometer, perform authenticated handshake and download new records."""
+        """Stay connected while the thermometer is on, syncing each new measurement."""
         if self._sync_lock.locked():
-            _LOGGER.debug("Sync already in progress for %s, skipping", self.address)
+            _LOGGER.debug("Session already open with %s, skipping", self.address)
             return
 
         async with self._sync_lock:
-            ble_device = bluetooth.async_ble_device_from_address(
-                self.hass, self.address, connectable=True
-            )
-            if not ble_device:
-                _LOGGER.debug("Device %s not available in BLE cache", self.address)
-                return
-
-            _LOGGER.info("Connecting to Braun device %s...", self.address)
             try:
-                client = await establish_connection(
-                    BleakClient,
-                    ble_device,
-                    self.entry.title,
-                    max_attempts=2,
-                )
-            except Exception as err:
-                _LOGGER.debug("Could not connect to %s (device likely asleep): %s", self.address, err)
-                return
-
-            try:
-                await self._async_perform_sync(client)
-            except Exception as err:
-                _LOGGER.warning("Sync failed with device %s: %s", self.address, err, exc_info=True)
+                await self._async_run_session()
             finally:
+                # The thermometer sends the same advertisement at every power-on, which
+                # Home Assistant drops as unchanged unless the history is cleared.
+                bluetooth.async_clear_advertisement_history(self.hass, self.address)
+
+    async def _async_run_session(self) -> None:
+        """Connect, sync pending records, then sync again on every final temperature."""
+        ble_device = bluetooth.async_ble_device_from_address(
+            self.hass, self.address, connectable=True
+        )
+        if not ble_device:
+            _LOGGER.debug("Device %s not available in BLE cache", self.address)
+            return
+
+        # True: a measurement was just taken. False: the device disconnected.
+        wakeups: asyncio.Queue[bool] = asyncio.Queue()
+        records: asyncio.Queue[bytes] = asyncio.Queue()
+
+        _LOGGER.info("Connecting to Braun device %s...", self.address)
+        try:
+            client = await establish_connection(
+                BleakClient,
+                ble_device,
+                self.entry.title,
+                disconnected_callback=lambda _client: wakeups.put_nowait(False),
+                max_attempts=2,
+            )
+        except Exception as err:
+            _LOGGER.debug("Could not connect to %s (device likely asleep): %s", self.address, err)
+            return
+
+        try:
+            await client.start_notify(
+                RECORD_NOTIFICATION_UUID, lambda _char, data: records.put_nowait(bytes(data))
+            )
+            await client.start_notify(
+                FINAL_TEMP_NOTIFICATION_UUID, lambda _char, _data: wakeups.put_nowait(True)
+            )
+            session_iv = os.urandom(12)
+            challenge = await client.read_gatt_char(CHALLENGE_REQUEST_UUID)
+            resp = compute_challenge_response(challenge, self.auth_key, session_iv)
+            await client.write_gatt_char(CHALLENGE_RESPONSE_UUID, resp, response=True)
+            _LOGGER.debug("Authenticated with %s", self.address)
+
+            battery = await client.read_gatt_char(BATTERY_LEVEL_UUID)
+            self.data["battery"] = battery[0]
+
+            sync = _RecordSync(client, self.enc_key, session_iv, records)
+            await self._async_sync_pending(sync)
+            # The device turns itself off about a minute after the last measurement.
+            while True:
                 try:
-                    await client.disconnect()
-                except Exception:
-                    pass
-
-    async def _async_perform_sync(self, client: BleakClient) -> None:
-        """Execute the authenticated handshake and read records."""
-        services = client.services
-        chars = {c.uuid.lower(): c for s in services for c in s.characteristics}
-
-        # Validate mandatory characteristics
-        if CHALLENGE_REQUEST_UUID.lower() not in chars or CHALLENGE_RESPONSE_UUID.lower() not in chars:
-            raise UpdateFailed("Device does not expose expected Kaz/Braun auth characteristics")
-
-        # Set up notification queue for incoming records
-        records_queue: asyncio.Queue[bytes] = asyncio.Queue()
-
-        def _notification_handler(_char: BleakGATTCharacteristic, data: bytearray) -> None:
-            records_queue.put_nowait(bytes(data))
-
-        await client.start_notify(RECORD_NOTIFICATION_UUID, _notification_handler)
-
-        # 1. Challenge / Response authentication
-        challenge = await client.read_gatt_char(CHALLENGE_REQUEST_UUID)
-        session_iv = os.urandom(12)
-        resp = compute_challenge_response(challenge, self.auth_key, session_iv)
-        await client.write_gatt_char(CHALLENGE_RESPONSE_UUID, resp, response=True)
-        _LOGGER.debug("Authenticated successfully with %s", self.address)
-
-        # 2. Read Battery Level (0x2A19) if present
-        if BATTERY_LEVEL_UUID.lower() in chars:
+                    measured = await asyncio.wait_for(wakeups.get(), timeout=SESSION_TIMEOUT)
+                except TimeoutError:
+                    _LOGGER.debug("Session with %s timed out", self.address)
+                    break
+                if not measured:
+                    break
+                await self._async_sync_pending(sync)
+        except Exception as err:
+            if client.is_connected:
+                _LOGGER.warning("Sync failed with device %s: %s", self.address, err, exc_info=True)
+        finally:
             try:
-                bat_raw = await client.read_gatt_char(BATTERY_LEVEL_UUID)
-                if bat_raw:
-                    self.data["battery"] = int(bat_raw[0])
-            except Exception as err:
-                _LOGGER.debug("Could not read battery level: %s", err)
+                await client.disconnect()
+            except Exception:
+                pass
+        _LOGGER.debug("Session with %s closed", self.address)
 
-        # 3. Read the number of measurements not yet synced (second byte)
-        enc_count = await client.read_gatt_char(RECORD_COUNT_UUID)
-        pending = decrypt_frame(enc_count, self.enc_key, session_iv)[1]
+    async def _async_sync_pending(self, sync: _RecordSync) -> None:
+        """Read, publish and acknowledge every measurement not yet synced."""
+        pending = await sync.pending()
         _LOGGER.debug("Device has %d new records", pending)
-
-        # 4. Read the oldest new record, then acknowledge it: the device drops it from
-        # its new list and the next one moves to index 0.
-        counter = 1
-
-        async def send(command: bytes) -> None:
-            nonlocal counter
-            counter += 1
-            req = encrypt_frame(command, self.enc_key, session_iv, counter)
-            await client.write_gatt_char(RECORD_INDEX_REQUEST_UUID, req, response=True)
-
         for _ in range(pending):
-            await send(READ_OLDEST_RECORD)
-            frame = await asyncio.wait_for(records_queue.get(), timeout=3.5)
-            record = self.profile.record_parser(decrypt_frame(frame, self.enc_key, session_iv))
+            record = self.profile.record_parser(await sync.read_oldest())
             self._async_dispatch_measurement_event(record)
             self.data["latest_record"] = record
             if "temperature" in record:
                 self.data["temperature"] = record["temperature"]
-            await send(ACK_OLDEST_RECORD)
+            await sync.ack_oldest()
 
         self.data["last_synced"] = datetime.now().isoformat()
         self.async_set_updated_data(self.data)
