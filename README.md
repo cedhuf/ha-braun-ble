@@ -108,7 +108,11 @@ See our step-by-step guide in [docs/apple-health-setup.md](docs/apple-health-set
 
 ## 🔬 Protocol & Technical Documentation
 
-For details on the Kaz/Braun GATT layout, reverse engineering findings, and AES-CCM frames, refer to [docs/thermoscan-7-findings.md](docs/thermoscan-7-findings.md).
+What is known about each device, with captured bytes and evidence levels:
+
+- [ThermoScan 7+ Connect (IRT6575)](docs/irt6575-support.md): supported.
+- [ExactFit 5 Connect (BUA6350)](docs/bua6350-support.md): research, not supported yet.
+- [Scope policy](docs/scope-policy.md): what the integration will not do, such as firmware updates.
 
 ---
 

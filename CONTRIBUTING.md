@@ -21,7 +21,7 @@ A protocol session receives the coordinator, a connected `BleakClient` and an `a
 
 ## Adding a model
 
-1. **Capture the advertisement** (local name, service UUIDs, manufacturer data) and the GATT layout. Document them in `docs/<model>-findings.md`, with sample payloads and serial numbers masked.
+1. **Capture the advertisement** (local name, service UUIDs, manufacturer data) and the GATT layout. Document them in `docs/<model>-support.md`, following [the ThermoScan one](docs/irt6575-support.md) and the [scope policy](docs/scope-policy.md), with sample payloads and serial numbers masked.
 2. **Reuse or write a protocol.** A model that speaks an existing protocol only needs a profile. Otherwise add `protocols/<family>.py` with `async_run_session` and a record parser, plus a test decoding captured payloads in `tests/`.
 3. **Reuse or add a measurement kind** in `kinds.py`, with its translations in `translations/*.json`.
 4. **Register the profile** in `SUPPORTED_MODELS`, and add a Bluetooth matcher to `manifest.json`.
