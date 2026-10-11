@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 SESSION_TIMEOUT = 300
+AGE_PROFILES = {1: "0_3_months", 2: "3_36_months", 3: "over_36_months"}
 
 
 def parse_record(payload: bytes) -> dict[str, Any]:
@@ -41,7 +42,8 @@ def parse_record(payload: bytes) -> dict[str, Any]:
 
     Measured on a TS7+ with firmware 1.2.0: [0] index, [4] sequence number,
     [6:10] measurement time (Unix, UTC), [12:16] body temperature (float32, °C),
-    [17:21] ambient temperature (float32, °C). The other bytes are unknown.
+    [16] low two bits: age profile chosen on the device, [17:21] ambient temperature
+    (float32, °C). The other bytes are unknown.
     """
     result: dict[str, Any] = {"raw_hex": payload.hex()}
     if len(payload) < 21:
@@ -53,6 +55,7 @@ def parse_record(payload: bytes) -> dict[str, Any]:
         "timestamp": datetime.fromtimestamp(int.from_bytes(payload[6:10], "big"), UTC).isoformat(),
         "temperature": round(body, 1),
         "ambient_temperature": round(ambient, 1),
+        "age_profile": AGE_PROFILES.get(payload[16] & 0x03),
         "unit": "°C",
     }
 

@@ -59,18 +59,29 @@ def test_challenge_response_layout():
         (
             "000000003f006acb658700014211f5c30b41c80000",
             {"sequence": 0x3F, "timestamp": "2026-10-11T10:31:35+00:00", "temperature": 36.5,
-             "ambient_temperature": 25.0},
+             "ambient_temperature": 25.0, "age_profile": "over_36_months"},
         ),
         (
             "0200000045006acb697f000142123d710b41c66666",
             {"sequence": 0x45, "timestamp": "2026-10-11T10:48:31+00:00", "temperature": 36.6,
-             "ambient_temperature": 24.8},
+             "ambient_temperature": 24.8, "age_profile": "over_36_months"},
         ),
     ],
 )
 def test_parse_captured_ts7_records(raw, expected):
     rec = parse_thermoscan_record(bytes.fromhex(raw))
     assert rec == {"raw_hex": raw, "unit": "°C", **expected}
+
+
+@pytest.mark.parametrize(
+    ("raw", "profile"),
+    [
+        ("0000000053006acb87160001421328f60941c00000", "0_3_months"),
+        ("0000000054006acb871d0001421328f60a41c0cccd", "3_36_months"),
+    ],
+)
+def test_parse_age_profile(raw, profile):
+    assert parse_thermoscan_record(bytes.fromhex(raw))["age_profile"] == profile
 
 
 def test_parse_short_record_keeps_raw_only():

@@ -19,7 +19,7 @@ TEXTS = {
         EVENT_BRAUN_MEASUREMENT: "measured {value}",
         EVENT_BRAUN_ATTRIBUTION: "was attributed {value}, measured {time}",
         EVENT_BRAUN_IGNORED: "ignored the {value} measurement from {time}",
-        "notify_message": "{value} measured {time}. Who was it for?",
+        "notify_message": "{value} measured {time}{details}. Who was it for?",
         "ignore": "Ignore",
         "pending_title": "Braun measurements to attribute",
         "pending_value": "{value} · {time}",
@@ -30,7 +30,7 @@ TEXTS = {
         EVENT_BRAUN_MEASUREMENT: "a mesuré {value}",
         EVENT_BRAUN_ATTRIBUTION: "s'est vu attribuer {value}, mesurés le {time}",
         EVENT_BRAUN_IGNORED: "a ignoré la mesure de {value} du {time}",
-        "notify_message": "{value} mesurés le {time}. Pour qui ?",
+        "notify_message": "{value} mesurés le {time}{details}. Pour qui ?",
         "ignore": "Ignorer",
         "pending_title": "Mesures Braun à attribuer",
         "pending_value": "{value} · {time}",
@@ -50,6 +50,7 @@ def text(hass: HomeAssistant, key: str, record: dict[str, Any] | None = None, **
         # Records stored before kinds existed are temperatures.
         kind = KINDS[record.get("kind", "temperature")]
         values["value"] = kind.format_value(record, _language(hass))
+        values["details"] = kind.format_details(record, _language(hass))
         values["time"] = ""
         if timestamp := record.get("timestamp"):
             values["time"] = dt_util.as_local(datetime.fromisoformat(timestamp)).strftime("%d/%m %H:%M")

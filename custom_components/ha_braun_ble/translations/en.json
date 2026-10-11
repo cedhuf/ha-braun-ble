@@ -64,16 +64,46 @@
   "entity": {
     "sensor": {
       "temperature": {
-        "name": "Last measurement"
+        "name": "Last measurement",
+        "state_attributes": {
+          "age_profile": {
+            "name": "Age profile",
+            "state": {
+              "0_3_months": "0-3 months",
+              "3_36_months": "3-36 months",
+              "over_36_months": "Over 36 months"
+            }
+          }
+        }
       },
       "battery": {
         "name": "Battery"
       },
       "person_temperature": {
-        "name": "Temperature"
+        "name": "Temperature",
+        "state_attributes": {
+          "age_profile": {
+            "name": "Age profile",
+            "state": {
+              "0_3_months": "0-3 months",
+              "3_36_months": "3-36 months",
+              "over_36_months": "Over 36 months"
+            }
+          }
+        }
       },
       "pending": {
-        "name": "Pending measurement"
+        "name": "Pending measurement",
+        "state_attributes": {
+          "age_profile": {
+            "name": "Age profile",
+            "state": {
+              "0_3_months": "0-3 months",
+              "3_36_months": "3-36 months",
+              "over_36_months": "Over 36 months"
+            }
+          }
+        }
       },
       "ambient_temperature": {
         "name": "Ambient temperature"

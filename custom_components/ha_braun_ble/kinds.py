@@ -47,6 +47,8 @@ class MeasurementKind:
     statistics: tuple[Statistic, ...]
     # Short text for a record, such as "36,7 °C", in the given language.
     format_value: Callable[[dict[str, Any], str], str]
+    # Optional context added to notifications, such as the age profile.
+    format_details: Callable[[dict[str, Any], str], str] = lambda _record, _language: ""
 
     def is_measurement(self, record: dict[str, Any]) -> bool:
         """Return whether a record carries every value field."""
@@ -58,10 +60,23 @@ def _format_temperature(record: dict[str, Any], language: str) -> str:
     return text.replace(".", ",") if language == "fr" else text
 
 
+AGE_PROFILE_LABELS = {
+    "en": {"0_3_months": "0-3 months", "3_36_months": "3-36 months", "over_36_months": "over 36 months"},
+    "fr": {"0_3_months": "0-3 mois", "3_36_months": "3-36 mois", "over_36_months": "plus de 36 mois"},
+}
+
+
+def _format_age_profile(record: dict[str, Any], language: str) -> str:
+    label = AGE_PROFILE_LABELS[language].get(record.get("age_profile") or "")
+    if not label:
+        return ""
+    return f" (profil {label})" if language == "fr" else f" ({label} profile)"
+
+
 TEMPERATURE = MeasurementKind(
     key="temperature",
     value_fields=("temperature",),
-    attributes=("ambient_temperature",),
+    attributes=("ambient_temperature", "age_profile"),
     device_sensors=(
         BraunSensorDescription(
             key="temperature",
@@ -93,6 +108,7 @@ TEMPERATURE = MeasurementKind(
         Statistic("temperature", UnitOfTemperature.CELSIUS, TemperatureConverter.UNIT_CLASS),
     ),
     format_value=_format_temperature,
+    format_details=_format_age_profile,
 )
 
 KINDS = {kind.key: kind for kind in (TEMPERATURE,)}
