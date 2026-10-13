@@ -32,7 +32,7 @@ Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and built
 | **Braun ThermoScan 4 Connect (`IRT3575`)** | Ear Thermometer | 🧪 Untested | Nobody yet |
 | **Braun ExactFit 5 Connect (`BUA6350`)** | Blood Pressure Monitor | 🧪 Experimental | [@cedhuf](https://github.com/cedhuf) |
 
-> Have another Braun BLE device? Check our [Contributing Guide](CONTRIBUTING.md) to add your model!
+> Have another Braun BLE device? Check our [Contributing Guide](CONTRIBUTING.md) to add your model, and say how it went in the [Home Assistant forum thread](https://community.home-assistant.io/t/braun-thermoscan-exactfit-over-ble-looking-for-testers/1028728).
 
 ---
 
