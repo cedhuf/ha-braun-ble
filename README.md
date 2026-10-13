@@ -29,7 +29,7 @@ Tested and verified on the **Braun ThermoScan 7+ Connect (`IRT6575`)** and built
 | Model | Device Type | Status | Tested By |
 |---|---|---|---|
 | **Braun ThermoScan 7+ Connect (`IRT6575`)** | Ear Thermometer | ✅ Full Support | [@cedhuf](https://github.com/cedhuf) |
-| **Braun ThermoScan 4 Connect (`IRT3575`)** | Ear Thermometer | 🧪 Experimental | Community |
+| **Braun ThermoScan 4 Connect (`IRT3575`)** | Ear Thermometer | 🧪 Untested | Nobody yet |
 | **Braun ExactFit 5 Connect (`BUA6350`)** | Blood Pressure Monitor | 🧪 Experimental | [@cedhuf](https://github.com/cedhuf) |
 
 > Have another Braun BLE device? Check our [Contributing Guide](CONTRIBUTING.md) to add your model!
