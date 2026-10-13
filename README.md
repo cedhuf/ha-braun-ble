@@ -1,3 +1,5 @@
+<p align="center"><img src="site/assets/og.png" alt="Braun Health BLE: every Braun reading, filed for the right person. Home Assistant device page and attribution notification."></p>
+
 # Braun Health BLE for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/default)
