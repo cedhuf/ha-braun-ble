@@ -6,7 +6,6 @@ import asyncio
 from datetime import UTC, datetime, tzinfo
 import logging
 from typing import TYPE_CHECKING, Any
-from zoneinfo import ZoneInfo
 
 from bleak import BleakClient
 
@@ -96,8 +95,7 @@ async def async_run_session(
                 break
             if payload is None:
                 break
-            local_tz = ZoneInfo(coordinator.hass.config.time_zone)
-            await coordinator.async_add_record(parse_record(payload, local_tz))
+            await coordinator.async_add_record(parse_record(payload, coordinator.time_zone))
             await coordinator.async_synced()
     finally:
         watcher.cancel()

@@ -6,7 +6,7 @@ Nothing here depends on a model: protocols hand records over and kinds describe 
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 import logging
 from typing import Any
 
@@ -36,6 +36,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_ALWAYS_ASK,
@@ -75,6 +76,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self.address: str = entry.unique_id or entry.data["address"]
         self.device_id: str | None = None
+        self.time_zone: tzinfo = dt_util.UTC
 
         model_id = entry.data.get(CONF_MODEL, "IRT6575")
         self.profile: BraunModelProfile = SUPPORTED_MODELS.get(
@@ -100,6 +102,7 @@ class BraunDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_setup(self) -> None:
         """Load pending measurements and listen for the device waking up."""
+        self.time_zone = await dt_util.async_get_time_zone(self.hass.config.time_zone) or dt_util.UTC
         stored = await self._store.async_load() or {}
         # Versions up to 0.1.15 stored only the pending list.
         if isinstance(stored, list):
