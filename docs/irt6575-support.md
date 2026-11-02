@@ -2,6 +2,7 @@
 
 **Status: Supported.** Owner-qualified on one device: pairing, live sync, record
 acknowledgement, attribution and age profile were all exercised on real hardware.
+A second owner confirmed the integration working out of the box on another unit.
 
 ## Scope and evidence
 
@@ -9,6 +10,7 @@ acknowledgement, attribution and age profile were all exercised on real hardware
 | --- | --- |
 | Device | Braun ThermoScan 7+ Connect `IRT6575`, made by Kaz (Helen of Troy) |
 | Identity read over BLE | Model number `TS7+`, firmware `1.2.0`, software `1.2.0` |
+| Second device | Reported 2026-11-02 on the Home Assistant forum: model `TS7+`, firmware `1.2.0`, Home Assistant 2026.10.5 through a wired ESPHome Bluetooth proxy |
 | Captures | 2026-10-11, macOS CoreBluetooth (bleak) next to the device, and Home Assistant 2026.10.1 through an ESPHome Bluetooth proxy |
 | Writes performed | Only the documented record commands (`00 00` read, `01 00` acknowledge) and the authentication response. No setting, clock or firmware write. |
 
