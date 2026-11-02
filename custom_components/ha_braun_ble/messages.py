@@ -51,7 +51,9 @@ def text(hass: HomeAssistant, key: str, record: dict[str, Any] | None = None, **
     if record is not None:
         # Records stored before kinds existed are temperatures.
         kind = KINDS[record.get("kind", "temperature")]
-        values["value"] = kind.format_value(record, _language(hass))
+        values["value"] = kind.format_value(
+            record, _language(hass), hass.config.units.temperature_unit
+        )
         values["details"] = kind.format_details(record, _language(hass))
         values["time"] = ""
         if timestamp := record.get("timestamp"):

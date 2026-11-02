@@ -45,8 +45,8 @@ class MeasurementKind:
     device_sensors: tuple[BraunSensorDescription, ...]
     person_sensors: tuple[SensorEntityDescription, ...]
     statistics: tuple[Statistic, ...]
-    # Short text for a record, such as "36,7 °C", in the given language.
-    format_value: Callable[[dict[str, Any], str], str]
+    # Short text for a record, such as "36,7 °C", in the given language and temperature unit.
+    format_value: Callable[[dict[str, Any], str, str], str]
     # Optional context added to notifications, such as the age profile.
     format_details: Callable[[dict[str, Any], str], str] = lambda _record, _language: ""
 
@@ -55,8 +55,13 @@ class MeasurementKind:
         return all(field in record for field in self.value_fields)
 
 
-def _format_temperature(record: dict[str, Any], language: str) -> str:
-    text = f"{record.get('temperature')} °C"
+def _format_temperature(record: dict[str, Any], language: str, unit: str) -> str:
+    value = record.get("temperature")
+    if unit == UnitOfTemperature.CELSIUS or value is None:
+        text = f"{value} {UnitOfTemperature.CELSIUS}"
+    else:
+        converted = TemperatureConverter.convert(value, UnitOfTemperature.CELSIUS, unit)
+        text = f"{converted:.1f} {unit}"
     return text.replace(".", ",") if language == "fr" else text
 
 
@@ -133,7 +138,7 @@ BLOOD_PRESSURE_FLAGS = {
 }
 
 
-def _format_blood_pressure(record: dict[str, Any], language: str) -> str:
+def _format_blood_pressure(record: dict[str, Any], language: str, _unit: str) -> str:
     pulse = "pouls" if language == "fr" else "pulse"
     return f"{record.get('systolic')}/{record.get('diastolic')} mmHg, {pulse} {record.get('pulse')}"
 
