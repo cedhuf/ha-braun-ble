@@ -40,11 +40,13 @@
         "title": "Who uses this thermometer?",
         "description": "The thermometer does not know who is being measured. Every measurement therefore waits to be attributed: the \"Pending measurement\" sensor on the device shows the oldest one, and one button per person files it, as does the notification sent to the phones chosen below (or \"Ignore pending measurement\" for a failed reading). Add the people to follow here; you can add or remove people later from the device page.",
         "data": {
+          "ha_people": "Home Assistant people",
           "people": "People",
           "notify": "Phones asked to attribute a measurement"
         },
         "data_description": {
-          "people": "One first name per entry. Leave empty to add people later.",
+          "ha_people": "Each one is added and linked to their Home Assistant person.",
+          "people": "People without a Home Assistant account (children, guests). One first name per entry. Leave empty to add people later.",
           "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing."
         }
       },
@@ -52,6 +54,7 @@
         "title": "Who uses this blood pressure monitor?",
         "description": "The monitor has two user buttons, A and B, and reports which one was used for each measurement.\n\n- **Button with a name**: its measurements go straight to that person.\n- **Button without a name**: you are asked about every measurement taken with it, by notification or from the device page, among all the people declared here.\n\nExample: button A for you, button B shared by the rest of the family. Give button A your name, leave button B without a name and add each family member under \"Other people\".",
         "data": {
+          "ha_people": "Other Home Assistant people",
           "user_A": "Person on button A",
           "user_B": "Person on button B",
           "people": "Other people",
@@ -59,10 +62,11 @@
           "always_ask": "Always ask who the measurement was for, whatever the button"
         },
         "data_description": {
+          "ha_people": "Offered for the measurements of a button without a name, and linked to their Home Assistant person.",
           "people": "People offered for the measurements of a button without a name (family, guests). One first name per entry.",
           "notify": "Only for measurements waiting to be attributed: a notification with one button per person. A measurement attributed automatically sends nothing.",
-          "user_A": "Leave empty if this button is shared: you will be asked about every measurement taken with it.",
-          "user_B": "Leave empty if this button is shared: you will be asked about every measurement taken with it.",
+          "user_A": "Leave empty if this button is shared: you will be asked about every measurement taken with it. A button's person can be linked to a Home Assistant person later, from the device page.",
+          "user_B": "Leave empty if this button is shared: you will be asked about every measurement taken with it. A button's person can be linked to a Home Assistant person later, from the device page.",
           "always_ask": "The names of buttons A and B are then ignored: every measurement waits to be attributed."
         }
       }

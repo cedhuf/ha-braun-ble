@@ -43,6 +43,7 @@ from .const import (
     CONF_ENC_KEY,
     CONF_MODEL,
     CONF_NOTIFY,
+    CONF_HA_PEOPLE,
     CONF_PEOPLE,
     CONF_PERSON,
     CONF_PIN,
@@ -321,6 +322,11 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ({CONF_NAME: name, CONF_DEVICE_USER: user}, name)
                 for user in users
                 if (name := user_input.get(f"user_{user}", "").strip())
+            ] + [
+                ({CONF_NAME: name, CONF_PERSON: entity_id}, name)
+                for entity_id in user_input.get(CONF_HA_PEOPLE, [])
+                if (state := self.hass.states.get(entity_id))
+                and (name := state.attributes.get("friendly_name") or entity_id)
             ] + [({CONF_NAME: name}, name) for name in user_input.get(CONF_PEOPLE, []) if name.strip()]
             return self.async_create_entry(
                 title=self._title,
@@ -342,6 +348,9 @@ class BraunBleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     **{vol.Optional(f"user_{user}"): str for user in users},
+                    vol.Optional(CONF_HA_PEOPLE): EntitySelector(
+                        EntitySelectorConfig(domain="person", multiple=True)
+                    ),
                     vol.Optional(CONF_PEOPLE): TextSelector(TextSelectorConfig(multiple=True)),
                     **({vol.Required(CONF_ALWAYS_ASK, default=False): bool} if users else {}),
                     vol.Optional(CONF_NOTIFY): _notify_selector(self.hass),

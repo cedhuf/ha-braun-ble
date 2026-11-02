@@ -40,11 +40,13 @@
         "title": "Qui utilise ce thermomètre ?",
         "description": "Le thermomètre ne sait pas qui est mesuré. Chaque mesure attend donc d'être attribuée : le capteur « Mesure à attribuer » de l'appareil affiche la plus ancienne, et un bouton par personne la range, tout comme la notification envoyée aux téléphones choisis ci-dessous (ou « Ignorer la mesure en attente » pour une mesure ratée). Déclarez ici les personnes à suivre ; vous pourrez en ajouter ou en retirer plus tard depuis la page de l'appareil.",
         "data": {
+          "ha_people": "Personnes Home Assistant",
           "people": "Personnes",
           "notify": "Téléphones prévenus pour attribuer une mesure"
         },
         "data_description": {
-          "people": "Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
+          "ha_people": "Chacune est ajoutée et liée à sa personne Home Assistant.",
+          "people": "Personnes sans compte Home Assistant (enfants, invités). Un prénom par champ. Laissez vide pour ajouter les personnes plus tard.",
           "notify": "Uniquement pour les mesures à attribuer : une notification avec un bouton par personne. Une mesure attribuée automatiquement n'envoie rien."
         }
       },
@@ -52,6 +54,7 @@
         "title": "Qui utilise ce tensiomètre ?",
         "description": "Le tensiomètre a deux boutons utilisateur, A et B, et indique pour chaque mesure lequel a servi.\n\n- **Bouton avec un prénom** : ses mesures vont directement à cette personne.\n- **Bouton sans prénom** : chaque mesure faite dessus vous est demandée, par notification ou depuis la page de l'appareil, parmi toutes les personnes déclarées ici.\n\nExemple : le bouton A pour vous, le bouton B partagé par le reste de la famille. Donnez votre prénom au bouton A, laissez le bouton B sans prénom et ajoutez chaque membre de la famille dans « Autres personnes ».",
         "data": {
+          "ha_people": "Autres personnes Home Assistant",
           "user_A": "Personne du bouton A",
           "user_B": "Personne du bouton B",
           "people": "Autres personnes",
@@ -59,10 +62,11 @@
           "always_ask": "Toujours demander à qui est la mesure, quel que soit le bouton"
         },
         "data_description": {
+          "ha_people": "Proposées pour les mesures d'un bouton sans prénom, et liées à leur personne Home Assistant.",
           "people": "Personnes proposées pour les mesures d'un bouton sans prénom (famille, invités). Un prénom par champ.",
           "notify": "Uniquement pour les mesures à attribuer : une notification avec un bouton par personne. Une mesure attribuée automatiquement n'envoie rien.",
-          "user_A": "Laissez vide si ce bouton est partagé : chaque mesure faite dessus vous sera demandée.",
-          "user_B": "Laissez vide si ce bouton est partagé : chaque mesure faite dessus vous sera demandée.",
+          "user_A": "Laissez vide si ce bouton est partagé : chaque mesure faite dessus vous sera demandée. La personne d'un bouton peut être liée à une personne Home Assistant plus tard, depuis la page de l'appareil.",
+          "user_B": "Laissez vide si ce bouton est partagé : chaque mesure faite dessus vous sera demandée. La personne d'un bouton peut être liée à une personne Home Assistant plus tard, depuis la page de l'appareil.",
           "always_ask": "Les prénoms des boutons A et B sont alors ignorés : chaque mesure attend d'être attribuée."
         }
       }
